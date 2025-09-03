@@ -124,7 +124,7 @@ if mode == keyin_label:
     st.subheader(stones_label)
     clear_stones = st.button(clear_all_label, key="clear_stones")
     stone_weights = []
-        for row in range(6):  # 6 rows x 5 cols = 30
+        for row in range(6):# 6 rows x 5 cols = 30
         cols = st.columns(5)
         for col in range(5):
         idx = row * 5 + col
