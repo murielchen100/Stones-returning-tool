@@ -67,23 +67,16 @@ def safe_float(val):
         return 0.0
 
 def valid_3_decimal(val):
-    # 只允許數字、小數點，且最多3位小數，無條件捨去
-    match = re.match(r"^(\d+)(\.\d{0,3})?", val)
-    if match:
-        return match.group(0)
-    elif val == "":
+    try:
+        f = float(val)
+        s = str(f)
+        if '.' in s:
+            int_part, dec_part = s.split('.')
+            return int_part + '.' + dec_part[:3]
+        else:
+            return s
+    except:
         return ""
-    else:
-        try:
-            f = float(val)
-            s = str(f)
-            if '.' in s:
-                int_part, dec_part = s.split('.')
-                return int_part + '.' + dec_part[:3]
-            else:
-                return s
-        except:
-            return ""
 
 def truncate_3_decimal(val):
     try:
@@ -135,6 +128,10 @@ if mode == keyin_label:
     st.subheader(stones_label)
     st.markdown(f'<span style="font-size:14px; color:gray;">單位：{cts_label}</span>', unsafe_allow_html=True)
     clear_stones = st.button(clear_all_label, key="clear_stones")
+    # 清除 session_state
+    if clear_stones:
+        for idx in range(30):
+            st.session_state[f"stone_{idx}"] = ""
     stone_weights = []
     for row in range(6):  # 6 rows x 5 cols = 30
         cols = st.columns(5)
@@ -143,7 +140,7 @@ if mode == keyin_label:
             key = f"stone_{idx}"
             default_val = "" if clear_stones else st.session_state.get(key, "")
             with cols[col]:
-                st.write(f"{idx+1}.", inline=True)
+                st.markdown(f"{idx+1}.", unsafe_allow_html=True)
                 raw_val = st.text_input(
                     "", value=default_val, key=key, label_visibility="collapsed", max_chars=10, placeholder="0.000"
                 )
@@ -153,6 +150,12 @@ if mode == keyin_label:
     st.markdown("---")
     st.subheader(rule_label)
     clear_rules = st.button(clear_all_label, key="clear_rules")
+    # 清除 session_state
+    if clear_rules:
+        for i in range(10):
+            st.session_state[f"pcs_{i}"] = ""
+            st.session_state[f"weight_{i}"] = ""
+            st.session_state[f"packid_{i}"] = ""
     rule_header = st.columns([0.7, 1.5, 1.5, 2])
     with rule_header[0]:
         st.markdown(" ")
@@ -202,7 +205,7 @@ if mode == keyin_label:
 
     st.markdown(f'<div style="text-align:right; color:gray; font-size:14px;">{cts_label}</div>', unsafe_allow_html=True)
 
-    if any(stone_weights) and any([r[col_pcs] for r in package_rules]):
+    if any(stone_weights) and any(r[col_pcs] for r in package_rules):
         results = calc_results(
             stone_weights, package_rules, tolerance,
             col_pcs, col_weight, col_ref,
@@ -225,6 +228,14 @@ elif mode == upload_label:
         try:
             stones_df = pd.read_excel(stone_file)
             packages_df = pd.read_excel(package_file)
+            # 欄位檢查
+            if col_weight not in stones_df.columns:
+                st.error(error_label)
+                st.stop()
+            required_cols = [col_pcs, col_weight, col_ref]
+            if not all(col in packages_df.columns for col in required_cols):
+                st.error(error_label)
+                st.stop()
             stones = stones_df[col_weight].tolist()
             package_rules = []
             for idx, row in packages_df.iterrows():
@@ -243,13 +254,13 @@ elif mode == upload_label:
     else:
         st.info(info_label)
 
-# 顯示結果與下載（期望重量靠左顯示）
+# 顯示結果與下載
 if results:
     st.subheader(result_label)
     df = pd.DataFrame(results)
     if expected_weight_label in df.columns:
         df[expected_weight_label] = df[expected_weight_label].astype(str)
-    st.dataframe(df)
+    st.dataframe(df, use_container_width=True)
 
     buffer = io.BytesIO()
     df.to_excel(buffer, index=False)
