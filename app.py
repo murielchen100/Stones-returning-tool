@@ -6,7 +6,44 @@ import io
 st.set_page_config(page_title="退石最優化計算工具", page_icon="💎", layout="wide")
 st.image("https://cdn-icons-png.flaticon.com/512/616/616490.png", width=80)
 
-# ...（語言切換區略）
+# 語言切換與欄位名稱
+lang = st.selectbox("選擇語言 / Language", ["中文", "English"])
+if lang == "中文":
+    st.header("💎 退石最優化計算工具")
+    mode_label = "選擇輸入方式"
+    upload_label = "上傳用石重量 Excel"
+    package_label = "上傳分包資訊 Excel"
+    keyin_label = "直接輸入用石重量"
+    rule_label = "直接輸入分包資訊"
+    stones_label = "用石"
+    result_label = "分配結果"
+    download_label = "下載結果 Excel"
+    error_label = "請上傳正確的 Excel 檔案"
+    info_label = "請上傳檔案或直接輸入資料"
+    no_match = "找不到符合組合"
+    assigned_stones_label = "分配用石"
+    clear_all_label = "清除全部"
+    assigned_weight_label = "分配重量"
+    expected_weight_label = "期望重量"
+    diff_label = "差異值"
+else:
+    st.header("💎 Stones Returning Optimizer")
+    mode_label = "Select input mode"
+    upload_label = "Upload stones weights Excel"
+    package_label = "Upload packs info Excel"
+    keyin_label = "Key in stones weights"
+    rule_label = "Key in packs info"
+    stones_label = "Stones"
+    result_label = "Result"
+    download_label = "Download result Excel"
+    error_label = "Please upload valid Excel files"
+    info_label = "Please upload files or key in data"
+    no_match = "No match found"
+    assigned_stones_label = "Assigned stones"
+    clear_all_label = "Clear all"
+    assigned_weight_label = "Assigned Weight"
+    expected_weight_label = "Expected Weight"
+    diff_label = "Difference"
 
 col_pcs = "pcs"
 col_weight = "cts"
