@@ -441,3 +441,5 @@ def main():
             file_name="stone_optimization_results.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
+if __name__ == "__main__":
+    main()
