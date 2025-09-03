@@ -11,7 +11,7 @@ st.image("https://cdn-icons-png.flaticon.com/512/616/616490.png", width=80)
 lang = st.selectbox("選擇語言 / Language", ["中文", "English"])
 if lang == "中文":
     st.header("💎 退石最優化計算工具")
-    st.markdown('<div style="font-size:12px; color:gray; margin-bottom:10px;">by Muriel</div>', unsafe_allow_html=True)
+    st.markdown('<div style="font-size:16px; color:green; margin-bottom:10px;">by Muriel</div>', unsafe_allow_html=True)
     mode_label = "選擇輸入方式"
     upload_label = "上傳用石重量 Excel"
     package_label = "上傳分包資訊 Excel"
@@ -63,16 +63,22 @@ def safe_float(val):
         return 0.0
 
 def limit_3_decimal(val):
-    # 只允許數字、小數點，且最多3位小數
-    match = re.match(r"^(\d+)(\.\d{0,3})?$", val)
+    # 只允許數字、小數點，且最多3位小數，超過直接截斷
+    match = re.match(r"^(\d+)(\.\d{0,3})?", val)
     if match:
-        return match.group(0)
+        return match.group(1) + (match.group(2) if match.group(2) else "")
     elif val == "":
         return ""
     else:
         try:
             f = float(val)
-            return "{:.3f}".format(f)
+            # 直接截斷到小數點第三位
+            s = str(f)
+            if '.' in s:
+                int_part, dec_part = s.split('.')
+                return int_part + '.' + dec_part[:3]
+            else:
+                return s
         except:
             return ""
 
@@ -119,21 +125,21 @@ if mode == keyin_label:
     clear_stones = st.button(clear_all_label, key="clear_stones")
     stone_weights = []
     for row in range(6):  # 6 rows x 5 cols = 30
-        cols = st.columns(5)
-        for col in range(5):
-            idx = row * 5 + col
-            if idx < 30:
-                with cols[col]:
-                    st.write(f"{idx+1}.", inline=True)
-                    if clear_stones:
-                        st.session_state[f"stone_{idx}"] = ""
-                    raw_val = st.text_input(
-                        "", value=st.session_state.get(f"stone_{idx}", ""), key=f"stone_{idx}", label_visibility="collapsed", max_chars=10
-                    )
-                    val = limit_3_decimal(raw_val)
-                    if val != raw_val:
-                        st.session_state[f"stone_{idx}"] = val
-                    stone_weights.append(safe_float(val))
+    cols = st.columns(5)
+    for col in range(5):
+        idx = row * 5 + col
+        if idx < 30:
+            with cols[col]:
+                st.write(f"{idx+1}.", inline=True)
+                if clear_stones:
+                    st.session_state[f"stone_{idx}"] = ""
+                raw_val = st.text_input(
+                    "", value=st.session_state.get(f"stone_{idx}", ""), key=f"stone_{idx}", label_visibility="collapsed", max_chars=10
+                )
+                val = limit_3_decimal(raw_val)
+                if val != raw_val:
+                    st.session_state[f"stone_{idx}"] = val
+                stone_weights.append(safe_float(val))
 
     st.markdown("---")
     st.subheader(rule_label)
