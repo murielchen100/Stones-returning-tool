@@ -141,16 +141,13 @@ if mode == keyin_label:
         for col in range(5):
             idx = row * 5 + col
             key = f"stone_{idx}"
-            if clear_stones:
-                st.session_state[key] = ""
+            default_val = "" if clear_stones else st.session_state.get(key, "")
             with cols[col]:
                 st.write(f"{idx+1}.", inline=True)
                 raw_val = st.text_input(
-                    "", value=st.session_state.get(key, ""), key=key, label_visibility="collapsed", max_chars=10, placeholder="0.000"
+                    "", value=default_val, key=key, label_visibility="collapsed", max_chars=10, placeholder="0.000"
                 )
                 val = valid_3_decimal(raw_val)
-                if val != raw_val:
-                    st.session_state[key] = val
                 stone_weights.append(safe_float(val))
 
     st.markdown("---")
@@ -173,27 +170,20 @@ if mode == keyin_label:
             st.markdown(f"{i+1}")
         with cols_rule[1]:
             key = f"pcs_{i}"
-            if clear_rules:
-                st.session_state[key] = ""
-            pcs_raw = st.text_input("", value=st.session_state.get(key, ""), key=key, label_visibility="collapsed", max_chars=5, placeholder="1")
+            default_val = "" if clear_rules else st.session_state.get(key, "")
+            pcs_raw = st.text_input("", value=default_val, key=key, label_visibility="collapsed", max_chars=5, placeholder="1")
             pcs_val = re.sub(r"\D", "", pcs_raw)[:3] if pcs_raw else "1"
-            if pcs_val != pcs_raw:
-                st.session_state[key] = pcs_val
             pcs = int(pcs_val) if pcs_val.isdigit() and int(pcs_val) > 0 else 1
         with cols_rule[2]:
             key = f"weight_{i}"
-            if clear_rules:
-                st.session_state[key] = ""
-            weight_raw = st.text_input("", value=st.session_state.get(key, ""), key=key, label_visibility="collapsed", max_chars=10, placeholder="0.000")
+            default_val = "" if clear_rules else st.session_state.get(key, "")
+            weight_raw = st.text_input("", value=default_val, key=key, label_visibility="collapsed", max_chars=10, placeholder="0.000")
             weight_val = valid_3_decimal(weight_raw)
-            if weight_val != weight_raw:
-                st.session_state[key] = weight_val
             total_weight = safe_float(weight_val)
         with cols_rule[3]:
             key = f"packid_{i}"
-            if clear_rules:
-                st.session_state[key] = ""
-            pack_id = st.text_input("Ref", value=st.session_state.get(key, ""), key=key, label_visibility="visible", max_chars=20, placeholder="Ref")
+            default_val = "" if clear_rules else st.session_state.get(key, "")
+            pack_id = st.text_input("Ref", value=default_val, key=key, label_visibility="visible", max_chars=20, placeholder="Ref")
         package_rules.append({
             col_pcs: pcs,
             col_weight: total_weight,
@@ -202,12 +192,9 @@ if mode == keyin_label:
 
     st.markdown("---")
     tol_key = "tolerance"
-    if clear_stones or clear_rules:
-        st.session_state[tol_key] = ""
-    tolerance_raw = st.text_input(f"{tolerance_label}", value=st.session_state.get(tol_key, ""), key=tol_key, placeholder="0.003")
+    default_tol = "" if clear_stones or clear_rules else st.session_state.get(tol_key, "")
+    tolerance_raw = st.text_input(f"{tolerance_label}", value=default_tol, key=tol_key, placeholder="0.003")
     tolerance_val = valid_3_decimal(tolerance_raw)
-    if tolerance_val != tolerance_raw:
-        st.session_state[tol_key] = tolerance_val
     try:
         tolerance = float(tolerance_val)
     except:
@@ -260,7 +247,6 @@ elif mode == upload_label:
 if results:
     st.subheader(result_label)
     df = pd.DataFrame(results)
-    # 讓期望重量欄位轉成字串，避免自動靠右
     if expected_weight_label in df.columns:
         df[expected_weight_label] = df[expected_weight_label].astype(str)
     st.dataframe(df)
