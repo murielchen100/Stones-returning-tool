@@ -124,41 +124,37 @@ if mode == keyin_label:
     st.subheader(stones_label)
     clear_stones = st.button(clear_all_label, key="clear_stones")
     stone_weights = []
-        for row in range(6):# 6 rows x 5 cols = 30
+    for row in range(6):  # 6 rows x 5 cols = 30
         cols = st.columns(5)
         for col in range(5):
-        idx = row * 5 + col
-        if idx < 30:
-            with cols[col]:
-                st.write(f"{idx+1}.", inline=True)
-                key = f"stone_{idx}"
-                # 取得目前值
-                current_val = st.session_state.get(key, "")
-                # 顯示輸入框
-                raw_val = st.text_input(
-                    "", value=current_val, key=key, label_visibility="collapsed", max_chars=10
-                )
-                # 自動截斷到小數點後3位
-                match = re.match(r"^(\d+)(\.\d{0,3})?", raw_val)
-                if match:
-                    new_val = match.group(1) + (match.group(2) if match.group(2) else "")
-                elif raw_val == "":
-                    new_val = ""
-                else:
-                    try:
-                        f = float(raw_val)
-                        s = str(f)
-                        if '.' in s:
-                            int_part, dec_part = s.split('.')
-                            new_val = int_part + '.' + dec_part[:3]
-                        else:
-                            new_val = s
-                    except:
+            idx = row * 5 + col
+            if idx < 30:
+                with cols[col]:
+                    st.write(f"{idx+1}.", inline=True)
+                    key = f"stone_{idx}"
+                    current_val = st.session_state.get(key, "")
+                    raw_val = st.text_input(
+                        "", value=current_val, key=key, label_visibility="collapsed", max_chars=10
+                    )
+                    match = re.match(r"^(\d+)(\.\d{0,3})?", raw_val)
+                    if match:
+                        new_val = match.group(1) + (match.group(2) if match.group(2) else "")
+                    elif raw_val == "":
                         new_val = ""
-                # 如果用戶輸入超過3位，馬上同步修正
-                if new_val != raw_val:
-                    st.session_state[key] = new_val
-                stone_weights.append(safe_float(new_val))
+                    else:
+                        try:
+                            f = float(raw_val)
+                            s = str(f)
+                            if '.' in s:
+                                int_part, dec_part = s.split('.')
+                                new_val = int_part + '.' + dec_part[:3]
+                            else:
+                                new_val = s
+                        except:
+                            new_val = ""
+                    if new_val != raw_val:
+                        st.session_state[key] = new_val
+                    stone_weights.append(safe_float(new_val))
 
     st.markdown("---")
     st.subheader(rule_label)
