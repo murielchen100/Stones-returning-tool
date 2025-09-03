@@ -8,7 +8,6 @@ import math
 st.set_page_config(page_title="退石最優化計算工具", layout="wide")
 st.image("https://cdn-icons-png.flaticon.com/512/616/616490.png", width=80)
 
-# 語言切換與欄位名稱
 lang = st.selectbox("選擇語言 / Language", ["中文", "English"])
 if lang == "中文":
     st.header("💎 退石最優化計算工具")
