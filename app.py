@@ -6,44 +6,7 @@ import io
 st.set_page_config(page_title="退石最優化計算工具", page_icon="💎", layout="wide")
 st.image("https://cdn-icons-png.flaticon.com/512/616/616490.png", width=80)
 
-# 多語言
-lang = st.selectbox("選擇語言 / Language", ["中文", "English"])
-if lang == "中文":
-    st.header("💎 退石最優化計算工具")
-    mode_label = "選擇輸入方式"
-    upload_label = "上傳用石重量 Excel"
-    package_label = "上傳分包資訊 Excel"
-    keyin_label = "直接輸入用石重量"
-    rule_label = "直接輸入分包資訊"
-    stones_label = "用石"
-    result_label = "分配結果"
-    download_label = "下載結果 Excel"
-    error_label = "請上傳正確的 Excel 檔案"
-    info_label = "請上傳檔案或直接輸入資料"
-    no_match = "找不到符合組合"
-    assigned_stones_label = "分配用石"
-    clear_all_label = "清除全部"
-    assigned_weight_label = "分配重量"
-    expected_weight_label = "期望重量"
-    diff_label = "差異值"
-else:
-    st.header("💎 Stones Returning Optimizer")
-    mode_label = "Select input mode"
-    upload_label = "Upload stones weights Excel"
-    package_label = "Upload packs info Excel"
-    keyin_label = "Key in stones weights"
-    rule_label = "Key in packs info"
-    stones_label = "Stones"
-    result_label = "Result"
-    download_label = "Download result Excel"
-    error_label = "Please upload valid Excel files"
-    info_label = "Please upload files or key in data"
-    no_match = "No match found"
-    assigned_stones_label = "Assigned stones"
-    clear_all_label = "Clear all"
-    assigned_weight_label = "Assigned Weight"
-    expected_weight_label = "Expected Weight"
-    diff_label = "Difference"
+# ...（語言切換區略）
 
 col_pcs = "pcs"
 col_weight = "cts"
@@ -52,6 +15,12 @@ col_ref = "Ref"
 st.markdown("---")
 
 mode = st.radio(mode_label, [upload_label, keyin_label])
+
+def safe_float(val):
+    try:
+        return float(val)
+    except:
+        return 0.0
 
 def calc_results(stones, package_rules, tolerance, col_pcs, col_weight, col_ref, assigned_stones_label, assigned_weight_label, expected_weight_label, diff_label, no_match):
     results = []
@@ -71,9 +40,9 @@ def calc_results(stones, package_rules, tolerance, col_pcs, col_weight, col_ref,
                 results.append({
                     col_ref: pack_id,
                     assigned_stones_label: combo,
-                    assigned_weight_label: round(total_assigned, 4),
-                    expected_weight_label: round(target, 4),
-                    diff_label: round(diff, 4)
+                    assigned_weight_label: f"{total_assigned:.4f}",
+                    expected_weight_label: f"{target:.4f}",
+                    diff_label: f"{diff:.4f}"
                 })
                 used_indices.update(combo_indices)
                 found = True
@@ -84,7 +53,7 @@ def calc_results(stones, package_rules, tolerance, col_pcs, col_weight, col_ref,
                 col_ref: pack_id,
                 assigned_stones_label: no_match,
                 assigned_weight_label: "-",
-                expected_weight_label: round(target, 4),
+                expected_weight_label: f"{target:.4f}",
                 diff_label: "-"
             })
     return results
@@ -93,7 +62,6 @@ results = []
 
 if mode == keyin_label:
     st.subheader(stones_label)
-    # 用石資訊區塊「清除全部」按鈕
     clear_stones = st.button(clear_all_label, key="clear_stones")
     stone_weights = []
     for row in range(6):  # 6 rows x 5 cols = 30
@@ -104,18 +72,15 @@ if mode == keyin_label:
                 with cols[col]:
                     st.write(f"{idx+1}.", inline=True)
                     if clear_stones:
-                        st.session_state[f"stone_{idx}"] = 0.0
-                    weight = st.number_input(
-                        "", min_value=0.0, step=None, format="%.3f",
-                        key=f"stone_{idx}", label_visibility="collapsed"
+                        st.session_state[f"stone_{idx}"] = ""
+                    val = st.text_input(
+                        "", value=st.session_state.get(f"stone_{idx}", ""), key=f"stone_{idx}", label_visibility="collapsed", max_chars=10
                     )
-                    stone_weights.append(weight)
+                    stone_weights.append(safe_float(val))
 
     st.markdown("---")
     st.subheader(rule_label)
-    # 分袋資訊區塊「清除全部」按鈕
     clear_rules = st.button(clear_all_label, key="clear_rules")
-    # 分包規則表頭
     rule_header = st.columns([0.7, 1.5, 1.5, 2])
     with rule_header[0]:
         st.markdown(" ")
@@ -133,27 +98,31 @@ if mode == keyin_label:
             st.markdown(f"{i+1}")
         with cols_rule[1]:
             if clear_rules:
-                st.session_state[f"pcs_{i}"] = 1
-            pcs = st.number_input("", min_value=1, step=None, key=f"pcs_{i}", label_visibility="collapsed")
+                st.session_state[f"pcs_{i}"] = ""
+            pcs_val = st.text_input("", value=st.session_state.get(f"pcs_{i}", ""), key=f"pcs_{i}", label_visibility="collapsed", max_chars=5)
+            pcs = int(pcs_val) if pcs_val.isdigit() and int(pcs_val) > 0 else 1
         with cols_rule[2]:
             if clear_rules:
-                st.session_state[f"weight_{i}"] = 0.0
-            total_weight = st.number_input("", min_value=0.0, step=None, format="%.3f", key=f"weight_{i}", label_visibility="collapsed")
+                st.session_state[f"weight_{i}"] = ""
+            weight_val = st.text_input("", value=st.session_state.get(f"weight_{i}", ""), key=f"weight_{i}", label_visibility="collapsed", max_chars=10)
+            total_weight = safe_float(weight_val)
         with cols_rule[3]:
             if clear_rules:
                 st.session_state[f"packid_{i}"] = ""
-            pack_id = st.text_input("", key=f"packid_{i}", label_visibility="collapsed")
+            pack_id = st.text_input("", value=st.session_state.get(f"packid_{i}", ""), key=f"packid_{i}", label_visibility="collapsed")
         package_rules.append({
             col_pcs: pcs,
             col_weight: total_weight,
             col_ref: pack_id.strip() if pack_id.strip() else str(i+1)
         })
 
-    # 容許誤差在最下方，調整時自動刷新結果
     st.markdown("---")
-    tolerance = st.number_input("容許誤差 (ct) / Tolerance", value=0.003, step=0.001, format="%.3f", key="tolerance")
+    tolerance_val = st.text_input("容許誤差 (ct) / Tolerance", value="0.003", key="tolerance")
+    try:
+        tolerance = float(tolerance_val)
+    except:
+        tolerance = 0.003
 
-    # 自動計算結果
     if any(stone_weights) and any([r[col_pcs] for r in package_rules]):
         results = calc_results(
             stone_weights, package_rules, tolerance,
@@ -165,7 +134,11 @@ elif mode == upload_label:
     stone_file = st.file_uploader(upload_label, type=["xlsx"], key="stone")
     package_file = st.file_uploader(package_label, type=["xlsx"], key="package")
     st.markdown("---")
-    tolerance = st.number_input("容許誤差 (ct) / Tolerance", value=0.003, step=0.001, format="%.3f", key="tolerance")
+    tolerance_val = st.text_input("容許誤差 (ct) / Tolerance", value="0.003", key="tolerance")
+    try:
+        tolerance = float(tolerance_val)
+    except:
+        tolerance = 0.003
 
     if stone_file and package_file:
         try:
@@ -189,10 +162,13 @@ elif mode == upload_label:
     else:
         st.info(info_label)
 
-# 顯示結果與下載
+# 顯示結果與下載（期望重量靠左顯示）
 if results:
     st.subheader(result_label)
     df = pd.DataFrame(results)
+    # 讓期望重量欄位轉成字串，避免自動靠右
+    if expected_weight_label in df.columns:
+        df[expected_weight_label] = df[expected_weight_label].astype(str)
     st.dataframe(df)
 
     buffer = io.BytesIO()
