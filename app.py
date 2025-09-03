@@ -2,6 +2,8 @@ import streamlit as st
 import pandas as pd
 import itertools
 import io
+import re
+import math
 
 st.set_page_config(page_title="退石最優化計算工具", layout="wide")
 st.image("https://cdn-icons-png.flaticon.com/512/616/616490.png", width=80)
@@ -27,7 +29,7 @@ if lang == "中文":
     assigned_weight_label = "分配重量"
     expected_weight_label = "期望重量"
     diff_label = "差異值"
-    tolerance_label = "容許誤差 (cts)"
+    tolerance_label = "容許誤差"
     cts_label = "cts"
 else:
     st.header("💎 Stones Returning Optimizer")
@@ -48,7 +50,7 @@ else:
     assigned_weight_label = "Assigned Weight"
     expected_weight_label = "Expected Weight"
     diff_label = "Difference"
-    tolerance_label = "Tolerance (cts)"
+    tolerance_label = "Tolerance"
     cts_label = "cts"
 
 col_pcs = "pcs"
@@ -58,6 +60,39 @@ col_ref = "Ref"
 st.markdown("---")
 
 mode = st.radio(mode_label, [upload_label, keyin_label])
+
+def safe_float(val):
+    try:
+        return float(val)
+    except:
+        return 0.0
+
+def valid_3_decimal(val):
+    # 只允許數字、小數點，且最多3位小數，無條件捨去
+    match = re.match(r"^(\d+)(\.\d{0,3})?", val)
+    if match:
+        return match.group(0)
+    elif val == "":
+        return ""
+    else:
+        try:
+            f = float(val)
+            s = str(f)
+            if '.' in s:
+                int_part, dec_part = s.split('.')
+                return int_part + '.' + dec_part[:3]
+            else:
+                return s
+        except:
+            return ""
+
+def truncate_3_decimal(val):
+    try:
+        f = float(val)
+        truncated = math.trunc(f * 1000) / 1000
+        return "{:.3f}".format(truncated)
+    except:
+        return ""
 
 def calc_results(stones, package_rules, tolerance, col_pcs, col_weight, col_ref, assigned_stones_label, assigned_weight_label, expected_weight_label, diff_label, no_match):
     results = []
@@ -71,14 +106,14 @@ def calc_results(stones, package_rules, tolerance, col_pcs, col_weight, col_ref,
         available = [i for i in range(len(stones)) if i not in used_indices]
         for combo_indices in itertools.combinations(available, count):
             combo = [stones[i] for i in combo_indices]
-            total_assigned = sum(combo)
-            diff = abs(total_assigned - target)
+            total_assigned = math.trunc(sum(combo) * 1000) / 1000
+            diff = math.trunc(abs(total_assigned - target) * 1000) / 1000
             if diff <= tolerance:
                 results.append({
                     col_ref: pack_id,
                     assigned_stones_label: combo,
                     assigned_weight_label: "{:.3f}".format(total_assigned),
-                    expected_weight_label: "{:.3f}".format(target),
+                    expected_weight_label: "{:.3f}".format(math.trunc(target * 1000) / 1000),
                     diff_label: "{:.3f}".format(diff)
                 })
                 used_indices.update(combo_indices)
@@ -90,7 +125,7 @@ def calc_results(stones, package_rules, tolerance, col_pcs, col_weight, col_ref,
                 col_ref: pack_id,
                 assigned_stones_label: no_match,
                 assigned_weight_label: "-",
-                expected_weight_label: "{:.3f}".format(target),
+                expected_weight_label: "{:.3f}".format(math.trunc(target * 1000) / 1000),
                 diff_label: "-"
             })
     return results
@@ -108,14 +143,16 @@ if mode == keyin_label:
             idx = row * 5 + col
             key = f"stone_{idx}"
             if clear_stones:
-                st.session_state[key] = 0.0
+                st.session_state[key] = ""
             with cols[col]:
                 st.write(f"{idx+1}.", inline=True)
-                val = st.number_input(
-                    cts_label, min_value=0.0, step=0.001, format="%.3f",
-                    key=key, label_visibility="visible"
+                raw_val = st.text_input(
+                    "", value=st.session_state.get(key, ""), key=key, label_visibility="collapsed", max_chars=10, placeholder="0.000"
                 )
-                stone_weights.append(val)
+                val = valid_3_decimal(raw_val)
+                if val != raw_val:
+                    st.session_state[key] = val
+                stone_weights.append(safe_float(val))
 
     st.markdown("---")
     st.subheader(rule_label)
@@ -126,7 +163,7 @@ if mode == keyin_label:
     with rule_header[1]:
         st.markdown("**pcs**")
     with rule_header[2]:
-        st.markdown(f"**{cts_label}**")
+        st.markdown("**cts**")
     with rule_header[3]:
         st.markdown("**Ref**")
 
@@ -138,18 +175,26 @@ if mode == keyin_label:
         with cols_rule[1]:
             key = f"pcs_{i}"
             if clear_rules:
-                st.session_state[key] = 1
-            pcs = st.number_input("", min_value=1, step=1, key=key, label_visibility="collapsed")
+                st.session_state[key] = ""
+            pcs_raw = st.text_input("", value=st.session_state.get(key, ""), key=key, label_visibility="collapsed", max_chars=5, placeholder="1")
+            pcs_val = re.sub(r"\D", "", pcs_raw)[:3] if pcs_raw else "1"
+            if pcs_val != pcs_raw:
+                st.session_state[key] = pcs_val
+            pcs = int(pcs_val) if pcs_val.isdigit() and int(pcs_val) > 0 else 1
         with cols_rule[2]:
             key = f"weight_{i}"
             if clear_rules:
-                st.session_state[key] = 0.0
-            total_weight = st.number_input(cts_label, min_value=0.0, step=0.001, format="%.3f", key=key, label_visibility="visible")
+                st.session_state[key] = ""
+            weight_raw = st.text_input("", value=st.session_state.get(key, ""), key=key, label_visibility="collapsed", max_chars=10, placeholder="0.000")
+            weight_val = valid_3_decimal(weight_raw)
+            if weight_val != weight_raw:
+                st.session_state[key] = weight_val
+            total_weight = safe_float(weight_val)
         with cols_rule[3]:
             key = f"packid_{i}"
             if clear_rules:
                 st.session_state[key] = ""
-            pack_id = st.text_input("", value=st.session_state.get(key, ""), key=key, label_visibility="collapsed")
+            pack_id = st.text_input("Ref", value=st.session_state.get(key, ""), key=key, label_visibility="visible", max_chars=20, placeholder="Ref")
         package_rules.append({
             col_pcs: pcs,
             col_weight: total_weight,
@@ -159,8 +204,17 @@ if mode == keyin_label:
     st.markdown("---")
     tol_key = "tolerance"
     if clear_stones or clear_rules:
-        st.session_state[tol_key] = 0.003
-    tolerance = st.number_input(tolerance_label, min_value=0.0, step=0.001, format="%.3f", key=tol_key)
+        st.session_state[tol_key] = ""
+    tolerance_raw = st.text_input(f"{tolerance_label}", value=st.session_state.get(tol_key, ""), key=tol_key, placeholder="0.003")
+    tolerance_val = valid_3_decimal(tolerance_raw)
+    if tolerance_val != tolerance_raw:
+        st.session_state[tol_key] = tolerance_val
+    try:
+        tolerance = float(tolerance_val)
+    except:
+        tolerance = 0.003
+
+    st.markdown(f'<div style="text-align:right; color:gray; font-size:14px;">{cts_label}</div>', unsafe_allow_html=True)
 
     if any(stone_weights) and any([r[col_pcs] for r in package_rules]):
         results = calc_results(
@@ -173,7 +227,13 @@ elif mode == upload_label:
     stone_file = st.file_uploader(upload_label, type=["xlsx"], key="stone")
     package_file = st.file_uploader(package_label, type=["xlsx"], key="package")
     st.markdown("---")
-    tolerance = st.number_input(tolerance_label, min_value=0.0, step=0.001, format="%.3f", key="tolerance")
+    tolerance_raw = st.text_input(f"{tolerance_label}", value="0.003", key="tolerance", placeholder="0.003")
+    tolerance_val = valid_3_decimal(tolerance_raw)
+    try:
+        tolerance = float(tolerance_val)
+    except:
+        tolerance = 0.003
+    st.markdown(f'<div style="text-align:right; color:gray; font-size:14px;">{cts_label}</div>', unsafe_allow_html=True)
 
     if stone_file and package_file:
         try:
@@ -215,4 +275,3 @@ if results:
         file_name="result.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
-
