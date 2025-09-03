@@ -5,7 +5,6 @@ import io
 import re
 import math
 from typing import List, Dict, Tuple, Optional
-import uuid
 
 # Page configuration
 st.set_page_config(page_title="退石最優化計算工具", layout="wide")
