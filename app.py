@@ -131,7 +131,9 @@ results = []
 if mode == keyin_label:
     st.subheader(stones_label)
     st.markdown(f'<span style="font-size:14px; color:gray;">單位：{cts_label}</span>', unsafe_allow_html=True)
-    # 不要顯示過往輸入數字，每次都初始化為空
+    # 直接用 value="" 並且 key 每次都不同，確保不會有歷史紀錄
+    import uuid
+    unique_key = str(uuid.uuid4())
     stone_weights = []
     for row in range(6):  # 6 rows x 5 cols = 30
         cols = st.columns(5)
@@ -140,7 +142,7 @@ if mode == keyin_label:
             with cols[col]:
                 st.markdown(f"{idx+1}.", unsafe_allow_html=True)
                 raw_val = st.text_input(
-                    "", value="", key=f"stone_{idx}_input", label_visibility="collapsed", max_chars=10, placeholder="0.000"
+                    "", value="", key=f"stone_{idx}_{unique_key}", label_visibility="collapsed", max_chars=10, placeholder="0.000"
                 )
                 val = valid_3_decimal(raw_val)
                 stone_weights.append(safe_float(val))
@@ -163,15 +165,15 @@ if mode == keyin_label:
         with cols_rule[0]:
             st.markdown(f"{i+1}")
         with cols_rule[1]:
-            pcs_raw = st.text_input("", value="", key=f"pcs_{i}_input", label_visibility="collapsed", max_chars=5, placeholder="1")
+            pcs_raw = st.text_input("", value="", key=f"pcs_{i}_{unique_key}", label_visibility="collapsed", max_chars=5, placeholder="1")
             pcs_val = re.sub(r"\D", "", pcs_raw)[:3] if pcs_raw else "1"
             pcs = int(pcs_val) if pcs_val.isdigit() and int(pcs_val) > 0 else 1
         with cols_rule[2]:
-            weight_raw = st.text_input("", value="", key=f"weight_{i}_input", label_visibility="collapsed", max_chars=10, placeholder="0.000")
+            weight_raw = st.text_input("", value="", key=f"weight_{i}_{unique_key}", label_visibility="collapsed", max_chars=10, placeholder="0.000")
             weight_val = valid_3_decimal(weight_raw)
             total_weight = safe_float(weight_val)
         with cols_rule[3]:
-            pack_id = st.text_input("Ref", value="", key=f"packid_{i}_input", label_visibility="visible", max_chars=20, placeholder="Ref")
+            pack_id = st.text_input("", value="", key=f"packid_{i}_{unique_key}", label_visibility="collapsed", max_chars=20, placeholder="")
         rule_dict = {
             col_pcs: pcs,
             col_weight: total_weight
@@ -182,7 +184,7 @@ if mode == keyin_label:
 
     st.markdown("---")
     tol_key = "tolerance"
-    tolerance_raw = st.text_input(f"{tolerance_label}", value="", key=tol_key, placeholder="0.003")
+    tolerance_raw = st.text_input(f"{tolerance_label}", value="", key=tol_key+unique_key, placeholder="0.003")
     tolerance_val = valid_3_decimal(tolerance_raw)
     try:
         tolerance = float(tolerance_val)
@@ -202,7 +204,7 @@ elif mode == upload_label:
     stone_file = st.file_uploader(upload_label, type=["xlsx"], key="stone")
     package_file = st.file_uploader(package_label, type=["xlsx"], key="package")
     st.markdown("---")
-    tolerance_raw = st.text_input(f"{tolerance_label}", value="0.003", key="tolerance", placeholder="0.003")
+    tolerance_raw = st.text_input(f"{tolerance_label}", value="0.003", key="tolerance_upload", placeholder="0.003")
     tolerance_val = valid_3_decimal(tolerance_raw)
     try:
         tolerance = float(tolerance_val)
@@ -246,8 +248,6 @@ elif mode == upload_label:
 if results:
     st.subheader(result_label)
     df = pd.DataFrame(results)
-    if expected_weight_label in df.columns:
-        df[expected_weight_label] = df[expected_weight_label].astype(str)
     st.dataframe(df, use_container_width=True)
 
     buffer = io.BytesIO()
@@ -259,3 +259,4 @@ if results:
         file_name="result.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
+
