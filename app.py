@@ -22,6 +22,7 @@ if lang == "中文":
     info_label = "請上傳檔案或直接輸入資料"
     no_match = "找不到符合組合"
     assigned_stones_label = "分配用石"
+    clear_all_label = "清除全部"
 else:
     st.header("💎 Stones Returning Optimizer")
     mode_label = "Select input mode"
@@ -36,6 +37,7 @@ else:
     info_label = "Please upload files or key in data"
     no_match = "No match found"
     assigned_stones_label = "Assigned stones"
+    clear_all_label = "Clear all"
 
 col_pcs = "pcs"
 col_weight = "cts"
@@ -79,7 +81,8 @@ results = []
 
 if mode == keyin_label:
     st.subheader(stones_label)
-    # 用石輸入區：每行5個，標號和欄位同一行，欄位寬度夠長
+    # 用石資訊區塊「清除全部」按鈕
+    clear_stones = st.button(clear_all_label, key="clear_stones")
     stone_weights = []
     for row in range(6):  # 6 rows x 5 cols = 30
         cols = st.columns(5)
@@ -88,6 +91,8 @@ if mode == keyin_label:
             if idx < 30:
                 with cols[col]:
                     st.write(f"{idx+1}.", inline=True)
+                    if clear_stones:
+                        st.session_state[f"stone_{idx}"] = 0.0
                     weight = st.number_input(
                         "", min_value=0.0, step=0.001, format="%.3f",
                         key=f"stone_{idx}", label_visibility="collapsed"
@@ -96,6 +101,8 @@ if mode == keyin_label:
 
     st.markdown("---")
     st.subheader(rule_label)
+    # 分袋資訊區塊「清除全部」按鈕
+    clear_rules = st.button(clear_all_label, key="clear_rules")
     # 分包規則表頭
     rule_header = st.columns([0.7, 1.5, 1.5, 2])
     with rule_header[0]:
@@ -113,10 +120,16 @@ if mode == keyin_label:
         with cols_rule[0]:
             st.markdown(f"{i+1}")
         with cols_rule[1]:
+            if clear_rules:
+                st.session_state[f"pcs_{i}"] = 1
             pcs = st.number_input("", min_value=1, step=1, key=f"pcs_{i}", label_visibility="collapsed")
         with cols_rule[2]:
+            if clear_rules:
+                st.session_state[f"weight_{i}"] = 0.0
             total_weight = st.number_input("", min_value=0.0, step=0.001, format="%.3f", key=f"weight_{i}", label_visibility="collapsed")
         with cols_rule[3]:
+            if clear_rules:
+                st.session_state[f"packid_{i}"] = ""
             pack_id = st.text_input("", key=f"packid_{i}", label_visibility="collapsed")
         package_rules.append({
             col_pcs: pcs,
@@ -126,9 +139,8 @@ if mode == keyin_label:
 
     # 容許誤差在最下方，調整時自動刷新結果
     st.markdown("---")
-    tolerance = st.number_input("容許誤差 (ct) / Tolerance", value=st.session_state["tolerance"], step=0.001, format="%.3f", key="tolerance")
-# 直接這樣寫即可，不要再手動操作 session_state
-tolerance = st.number_input("容許誤差 (ct) / Tolerance", value=0.003, step=0.001, format="%.3f", key="tolerance")
+    tolerance = st.number_input("容許誤差 (ct) / Tolerance", value=0.003, step=0.001, format="%.3f", key="tolerance")
+
     # 自動計算結果
     if any(stone_weights) and any([r[col_pcs] for r in package_rules]):
         results = calc_results(stone_weights, package_rules, tolerance, col_pcs, col_weight, col_ref, assigned_stones_label, no_match)
@@ -137,8 +149,7 @@ elif mode == upload_label:
     stone_file = st.file_uploader(upload_label, type=["xlsx"], key="stone")
     package_file = st.file_uploader(package_label, type=["xlsx"], key="package")
     st.markdown("---")
-    tolerance = st.number_input("容許誤差 (ct) / Tolerance", value=st.session_state["tolerance"], step=0.001, format="%.3f", key="tolerance")
-    st.session_state["tolerance"] = tolerance
+    tolerance = st.number_input("容許誤差 (ct) / Tolerance", value=0.003, step=0.001, format="%.3f", key="tolerance")
 
     if stone_file and package_file:
         try:
