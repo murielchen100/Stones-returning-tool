@@ -4,7 +4,6 @@ import itertools
 import io
 import re
 import math
-from typing import List, Dict, Tuple, Optional
 
 # Page configuration
 st.set_page_config(page_title="退石最優化計算工具", layout="wide")
@@ -33,6 +32,8 @@ class StoneOptimizer:
             if not val:
                 return ""
             f = float(val)
+            if f < 0:
+                return ""  # Prevent negative weights
             s = str(f)
             if '.' in s:
                 int_part, dec_part = s.split('.')
@@ -46,13 +47,15 @@ class StoneOptimizer:
         """Truncate to 3 decimal places"""
         try:
             f = float(val)
+            if f < 0:
+                return "0.000"  # Prevent negative weights
             truncated = math.trunc(f * 1000) / 1000
             return f"{truncated:.3f}"
         except (ValueError, TypeError):
             return "0.000"
     
-    def find_best_combination(self, available_stones: List[float], target_count: int, 
-                            target_weight: float, tolerance: float) -> Optional[Tuple[List[int], float, float]]:
+    def find_best_combination(self, available_stones: list[float], target_count: int, 
+                            target_weight: float, tolerance: float) -> tuple[list[int], float, float] | None:
         """Find the best combination of stones that matches the target"""
         best_combo = None
         best_diff = float('inf')
@@ -69,8 +72,8 @@ class StoneOptimizer:
         
         return best_combo
     
-    def calculate_optimal_assignment(self, stones: List[float], package_rules: List[Dict], 
-                                   tolerance: float, labels: Dict[str, str]) -> List[Dict]:
+    def calculate_optimal_assignment(self, stones: list[float], package_rules: list[dict], 
+                                   tolerance: float, labels: dict[str, str]) -> list[dict]:
         """Calculate optimal stone assignment"""
         results = []
         available_stones = stones.copy()
@@ -126,7 +129,7 @@ class StoneOptimizer:
         
         return results
 
-def get_language_labels(lang: str) -> Dict[str, str]:
+def get_language_labels(lang: str) -> dict[str, str]:
     """Get language-specific labels"""
     if lang == "中文":
         return {
@@ -139,15 +142,17 @@ def get_language_labels(lang: str) -> Dict[str, str]:
             "stones_label": "用石",
             "result_label": "分配結果",
             "download_label": "下載結果 Excel",
-            "error_label": "請上傳正確的 Excel 檔案",
-            "info_label": "請上傳檔案或直接輸入資料",
+            "error_label": "請上傳正確的 Excel 檔案（需包含正確欄位）",
+            "info_label": "請上傳檔案或輸入資料以進行計算",
             "no_match": "找不到符合組合",
             "assigned_stones": "分配用石",
             "assigned_weight": "分配重量",
             "expected_weight": "期望重量",
             "diff": "差異值",
             "tolerance": "容許誤差",
-            "cts": "cts"
+            "cts": "cts",
+            "invalid_input": "請輸入有效數字（非負數）",
+            "no_data": "請至少輸入一個有效用石重量和分包規則"
         }
     else:
         return {
@@ -160,18 +165,20 @@ def get_language_labels(lang: str) -> Dict[str, str]:
             "stones_label": "Stones",
             "result_label": "Result",
             "download_label": "Download result Excel",
-            "error_label": "Please upload valid Excel files",
-            "info_label": "Please upload files or key in data",
+            "error_label": "Please upload valid Excel files with correct columns",
+            "info_label": "Please upload files or enter data to proceed",
             "no_match": "No match found",
             "assigned_stones": "Assigned stones",
             "assigned_weight": "Assigned Weight",
             "expected_weight": "Expected Weight",
             "diff": "Difference",
             "tolerance": "Tolerance",
-            "cts": "cts"
+            "cts": "cts",
+            "invalid_input": "Please enter valid numbers (non-negative)",
+            "no_data": "Please provide at least one valid stone weight and package rule"
         }
 
-def create_stone_input_grid(labels: Dict[str, str], unique_key: str) -> List[float]:
+def create_stone_input_grid(labels: dict[str, str]) -> list[float]:
     """Create stone weight input grid"""
     st.subheader(labels["stones_label"])
     st.markdown(f'<span style="font-size:14px; color:gray;">單位：{labels["cts"]}</span>', 
@@ -186,18 +193,19 @@ def create_stone_input_grid(labels: Dict[str, str], unique_key: str) -> List[flo
                 st.markdown(f"**{idx+1}.**")
                 raw_val = st.text_input(
                     "", 
-                    value="", 
-                    key=f"stone_{idx}_{unique_key}", 
+                    key=f"stone_{idx}", 
                     label_visibility="collapsed", 
                     max_chars=10, 
                     placeholder="0.000"
                 )
                 val = StoneOptimizer.valid_3_decimal(raw_val)
+                if raw_val and not val:  # Invalid input detected
+                    st.warning(labels["invalid_input"], icon="⚠️")
                 stone_weights.append(StoneOptimizer.safe_float(val))
     
     return stone_weights
 
-def create_package_rules_input(labels: Dict[str, str], unique_key: str) -> List[Dict]:
+def create_package_rules_input(labels: dict[str, str]) -> list[dict]:
     """Create package rules input section"""
     st.subheader(labels["rule_label"])
     
@@ -222,32 +230,33 @@ def create_package_rules_input(labels: Dict[str, str], unique_key: str) -> List[
         with cols_rule[1]:
             pcs_raw = st.text_input(
                 "", 
-                value="", 
-                key=f"pcs_{i}_{unique_key}", 
+                key=f"pcs_{i}", 
                 label_visibility="collapsed", 
                 max_chars=3, 
                 placeholder="1"
             )
-            pcs_val = re.sub(r"\D", "", pcs_raw)[:3] if pcs_raw else "1"
-            pcs = int(pcs_val) if pcs_val.isdigit() and int(pcs_val) > 0 else 1
+            pcs_val = re.sub(r"\D", "", pcs_raw)[:3] if pcs_raw else ""
+            pcs = int(pcs_val) if pcs_val.isdigit() and int(pcs_val) > 0 else 0
+            if pcs_raw and pcs == 0:
+                st.warning(labels["invalid_input"], icon="⚠️")
         
         with cols_rule[2]:
             weight_raw = st.text_input(
                 "", 
-                value="", 
-                key=f"weight_{i}_{unique_key}", 
+                key=f"weight_{i}", 
                 label_visibility="collapsed", 
                 max_chars=10, 
                 placeholder="0.000"
             )
             weight_val = StoneOptimizer.valid_3_decimal(weight_raw)
             total_weight = StoneOptimizer.safe_float(weight_val)
+            if weight_raw and not weight_val:
+                st.warning(labels["invalid_input"], icon="⚠️")
         
         with cols_rule[3]:
             pack_id = st.text_input(
                 "", 
-                value="", 
-                key=f"packid_{i}_{unique_key}", 
+                key=f"packid_{i}", 
                 label_visibility="collapsed", 
                 max_chars=20, 
                 placeholder="Optional"
@@ -285,15 +294,14 @@ def main():
     
     if mode == labels["keyin_label"]:
         # Manual input mode
-        unique_key = str(uuid.uuid4())
         
         # Stone weights input
-        stone_weights = create_stone_input_grid(labels, unique_key)
+        stone_weights = create_stone_input_grid(labels)
         
         st.markdown("---")
         
         # Package rules input
-        package_rules = create_package_rules_input(labels, unique_key)
+        package_rules = create_package_rules_input(labels)
         
         st.markdown("---")
         
@@ -301,17 +309,21 @@ def main():
         tolerance_raw = st.text_input(
             f"{labels['tolerance']}", 
             value="0.003", 
-            key=f"tolerance_{unique_key}", 
+            key="tolerance_manual", 
             placeholder="0.003"
         )
         tolerance_val = StoneOptimizer.valid_3_decimal(tolerance_raw)
+        if tolerance_raw and not tolerance_val:
+            st.warning(labels["invalid_input"], icon="⚠️")
         tolerance = StoneOptimizer.safe_float(tolerance_val) or 0.003
         
         st.markdown(f'<div style="text-align:right; color:gray; font-size:14px;">{labels["cts"]}</div>', 
                     unsafe_allow_html=True)
         
-        # Calculate results if data is available
-        if any(w > 0 for w in stone_weights) and package_rules:
+        # Check for valid input before calculation
+        if not any(w > 0 for w in stone_weights) or not package_rules:
+            st.warning(labels["no_data"], icon="⚠️")
+        else:
             results = optimizer.calculate_optimal_assignment(
                 [w for w in stone_weights if w > 0],  # Filter out zero weights
                 package_rules, 
@@ -339,6 +351,8 @@ def main():
             placeholder="0.003"
         )
         tolerance_val = StoneOptimizer.valid_3_decimal(tolerance_raw)
+        if tolerance_raw and not tolerance_val:
+            st.warning(labels["invalid_input"], icon="⚠️")
         tolerance = StoneOptimizer.safe_float(tolerance_val) or 0.003
         
         st.markdown(f'<div style="text-align:right; color:gray; font-size:14px;">{labels["cts"]}</div>', 
@@ -350,18 +364,22 @@ def main():
                 stones_df = pd.read_excel(stone_file)
                 packages_df = pd.read_excel(package_file)
                 
+                # Normalize column names to lowercase
+                stones_df.columns = stones_df.columns.str.lower()
+                packages_df.columns = packages_df.columns.str.lower()
+                
                 # Validate columns
                 if "cts" not in stones_df.columns:
-                    st.error(labels["error_label"])
+                    st.error(f"{labels['error_label']}: Missing 'cts' column in stones file")
                     st.stop()
                 
                 required_cols = ["pcs", "cts"]
                 if not all(col in packages_df.columns for col in required_cols):
-                    st.error(labels["error_label"])
+                    st.error(f"{labels['error_label']}: Missing required columns {required_cols} in packages file")
                     st.stop()
                 
                 # Extract data
-                stones = [w for w in stones_df["cts"].tolist() if w > 0]  # Filter positive weights
+                stones = [float(w) for w in stones_df["cts"].tolist() if pd.notnull(w) and float(w) > 0]
                 
                 package_rules = []
                 for _, row in packages_df.iterrows():
@@ -370,12 +388,14 @@ def main():
                             "pcs": int(row["pcs"]),
                             "cts": float(row["cts"])
                         }
-                        if "Ref" in packages_df.columns and pd.notnull(row["Ref"]) and str(row["Ref"]).strip():
-                            rule_dict["Ref"] = str(row["Ref"]).strip()
+                        if "ref" in packages_df.columns and pd.notnull(row["ref"]) and str(row["ref"]).strip():
+                            rule_dict["Ref"] = str(row["ref"]).strip()
                         package_rules.append(rule_dict)
                 
-                # Calculate results
-                if stones and package_rules:
+                # Check for valid input
+                if not stones or not package_rules:
+                    st.warning(labels["no_data"], icon="⚠️")
+                else:
                     results = optimizer.calculate_optimal_assignment(stones, package_rules, tolerance, labels)
                 
             except Exception as e:
@@ -388,9 +408,26 @@ def main():
         st.markdown("---")
         st.subheader(labels["result_label"])
         
-        # Create DataFrame and display
+        # Create DataFrame and display with custom formatting
         df = pd.DataFrame(results)
-        st.dataframe(df, use_container_width=True)
+        # Ensure consistent column order
+        columns = [labels["assigned_stones"], labels["assigned_weight"], 
+                   labels["expected_weight"], labels["diff"]]
+        if optimizer.col_ref in df.columns:
+            columns.append(optimizer.col_ref)
+        df = df[columns]
+        
+        # Apply formatting for better display
+        def format_dataframe(df):
+            formatted_df = df.copy()
+            for col in [labels["assigned_weight"], labels["expected_weight"], labels["diff"]]:
+                if col in formatted_df.columns:
+                    formatted_df[col] = formatted_df[col].apply(
+                        lambda x: f"{float(x):.3f}" if x != "-" else x
+                    )
+            return formatted_df
+        
+        st.dataframe(format_dataframe(df), use_container_width=True)
         
         # Download functionality
         buffer = io.BytesIO()
@@ -415,6 +452,8 @@ def main():
                 avg_diff = sum(float(r[labels["diff"]]) for r in results 
                              if r[labels["diff"]] != "-") / matched_count
                 st.metric("Average Difference", f"{avg_diff:.3f} cts")
+            else:
+                st.write("No successful matches to calculate average difference.")
 
 if __name__ == "__main__":
     main()
