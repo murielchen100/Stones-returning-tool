@@ -441,19 +441,3 @@ def main():
             file_name="stone_optimization_results.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
-        
-        # Display statistics
-        with st.expander("📊 Statistics"):
-            matched_count = sum(1 for r in results if r[labels["assigned_stones"]] != labels["no_match"])
-            total_count = len(results)
-            st.metric("Successful Matches", f"{matched_count}/{total_count}")
-            
-            if matched_count > 0:
-                avg_diff = sum(float(r[labels["diff"]]) for r in results 
-                             if r[labels["diff"]] != "-") / matched_count
-                st.metric("Average Difference", f"{avg_diff:.3f} cts")
-            else:
-                st.write("No successful matches to calculate average difference.")
-
-if __name__ == "__main__":
-    main()
