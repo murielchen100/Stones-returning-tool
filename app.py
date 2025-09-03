@@ -19,10 +19,8 @@ if lang == "中文":
     result_label = "分配結果"
     download_label = "下載結果 Excel"
     error_label = "請上傳正確的 Excel 檔案"
-    tolerance_label = "容許誤差 (ct)"
     info_label = "請上傳檔案或直接輸入資料"
     no_match = "找不到符合組合"
-    start_label = "開始分配"
     assigned_stones_label = "分配用石"
 else:
     st.header("💎 Stones Returning Optimizer")
@@ -35,132 +33,133 @@ else:
     result_label = "Result"
     download_label = "Download result Excel"
     error_label = "Please upload valid Excel files"
-    tolerance_label = "Tolerance (ct)"
     info_label = "Please upload files or key in data"
     no_match = "No match found"
-    start_label = "Start"
     assigned_stones_label = "Assigned stones"
 
-# 表頭欄位（中英文都一樣）
 col_pcs = "pcs"
 col_weight = "cts"
 col_ref = "Ref"
 
 st.markdown("---")
 
-# 選擇輸入方式
 mode = st.radio(mode_label, [upload_label, keyin_label])
 
-tolerance = st.number_input(tolerance_label, value=0.003, step=0.001, format="%.3f")
+if "tolerance" not in st.session_state:
+    st.session_state["tolerance"] = 0.003
+
+def calc_results(stones, package_rules, tolerance, col_pcs, col_weight, col_ref, assigned_stones_label, no_match):
+    results = []
+    used_indices = set()
+    for idx, rule in enumerate(package_rules):
+        count = int(rule[col_pcs])
+        target = float(rule[col_weight])
+        pack_id = rule[col_ref] if rule[col_ref] else str(idx+1)
+        found = False
+
+        available = [i for i in range(len(stones)) if i not in used_indices]
+        for combo_indices in itertools.combinations(available, count):
+            combo = [stones[i] for i in combo_indices]
+            if abs(sum(combo) - target) <= tolerance:
+                results.append({
+                    col_ref: pack_id,
+                    assigned_stones_label: combo,
+                    col_weight: sum(combo)
+                })
+                used_indices.update(combo_indices)
+                found = True
+                break
+
+        if not found:
+            results.append({
+                col_ref: pack_id,
+                assigned_stones_label: no_match,
+                col_weight: "-"
+            })
+    return results
 
 results = []
 
-if mode == upload_label:
-    # 上傳檔案模式
-    stone_file = st.file_uploader(upload_label, type=["xlsx"], key="stone")
-    package_file = st.file_uploader(package_label, type=["xlsx"], key="package")
-
-    if stone_file and package_file:
-        try:
-            stones_df = pd.read_excel(stone_file)
-            packages_df = pd.read_excel(package_file)
-            stones = stones_df[col_weight].tolist()
-            used_indices = set()
-
-            # 假設 packages_df 有 col_ref, col_pcs, col_weight 三個欄位
-            for idx, row in packages_df.iterrows():
-                count = int(row[col_pcs])
-                target = float(row[col_weight])
-                pack_id = str(row[col_ref]) if pd.notnull(row[col_ref]) and str(row[col_ref]).strip() else str(idx+1)
-                found = False
-
-                available = [i for i in range(len(stones)) if i not in used_indices]
-                for combo_indices in itertools.combinations(available, count):
-                    combo = [stones[i] for i in combo_indices]
-                    if abs(sum(combo) - target) <= tolerance:
-                        results.append({
-                            col_ref: pack_id,
-                            assigned_stones_label: combo,
-                            col_weight: sum(combo)
-                        })
-                        used_indices.update(combo_indices)
-                        found = True
-                        break
-
-                if not found:
-                    results.append({
-                        col_ref: pack_id,
-                        assigned_stones_label: no_match,
-                        col_weight: "-"
-                    })
-        except Exception as e:
-            st.error(error_label)
-    else:
-        st.info(info_label)
-
-elif mode == keyin_label:
-    # 直接輸入模式
+if mode == keyin_label:
     st.subheader(stones_label)
-    # Stones 輸入區：只顯示一次 Stones，下面 1~30 編號
-    st.markdown("**Stones**")
-    st.markdown(" | ".join([str(i+1) for i in range(30)]))
+    # 用石輸入區：每行5個，標號和欄位同一行，欄位寬度夠長
     stone_weights = []
-    cols = st.columns(30)
-    for i in range(30):
-        with cols[i]:
-            weight = st.number_input("", min_value=0.0, step=0.001, format="%.3f", key=f"stone_{i}")
-            stone_weights.append(weight)
+    for row in range(6):  # 6 rows x 5 cols = 30
+        cols = st.columns(5)
+        for col in range(5):
+            idx = row * 5 + col
+            if idx < 30:
+                with cols[col]:
+                    st.write(f"{idx+1}.", inline=True)
+                    weight = st.number_input(
+                        "", min_value=0.0, step=0.001, format="%.3f",
+                        key=f"stone_{idx}", label_visibility="collapsed"
+                    )
+                    stone_weights.append(weight)
 
     st.markdown("---")
     st.subheader(rule_label)
     # 分包規則表頭
-    st.markdown(f"|   | {col_pcs} | {col_weight} | {col_ref} |")
-    st.markdown(f"|---|------|------|------|")
+    rule_header = st.columns([0.7, 1.5, 1.5, 2])
+    with rule_header[0]:
+        st.markdown(" ")
+    with rule_header[1]:
+        st.markdown("**pcs**")
+    with rule_header[2]:
+        st.markdown("**cts**")
+    with rule_header[3]:
+        st.markdown("**Ref**")
+
     package_rules = []
     for i in range(10):
-        cols_rule = st.columns([1, 2, 2, 3])
+        cols_rule = st.columns([0.7, 1.5, 1.5, 2])
         with cols_rule[0]:
-            st.markdown(f"**{i+1}**")
+            st.markdown(f"{i+1}")
         with cols_rule[1]:
-            pcs = st.number_input("", min_value=1, step=1, key=f"pcs_{i}")
+            pcs = st.number_input("", min_value=1, step=1, key=f"pcs_{i}", label_visibility="collapsed")
         with cols_rule[2]:
-            total_weight = st.number_input("", min_value=0.0, step=0.001, format="%.3f", key=f"weight_{i}")
+            total_weight = st.number_input("", min_value=0.0, step=0.001, format="%.3f", key=f"weight_{i}", label_visibility="collapsed")
         with cols_rule[3]:
-            pack_id = st.text_input("", key=f"packid_{i}")
+            pack_id = st.text_input("", key=f"packid_{i}", label_visibility="collapsed")
         package_rules.append({
             col_pcs: pcs,
             col_weight: total_weight,
             col_ref: pack_id.strip() if pack_id.strip() else str(i+1)
         })
 
-    if st.button(start_label):
-        stones = stone_weights
-        used_indices = set()
-        for idx, rule in enumerate(package_rules):
-            count = int(rule[col_pcs])
-            target = float(rule[col_weight])
-            pack_id = rule[col_ref] if rule[col_ref] else str(idx+1)
-            found = False
+    # 容許誤差在最下方，調整時自動刷新結果
+    st.markdown("---")
+    tolerance = st.number_input("容許誤差 (ct) / Tolerance", value=st.session_state["tolerance"], step=0.001, format="%.3f", key="tolerance")
+    st.session_state["tolerance"] = tolerance
 
-            available = [i for i in range(len(stones)) if i not in used_indices]
-            for combo_indices in itertools.combinations(available, count):
-                combo = [stones[i] for i in combo_indices]
-                if abs(sum(combo) - target) <= tolerance:
-                    results.append({
-                        col_ref: pack_id,
-                        assigned_stones_label: combo,
-                        col_weight: sum(combo)
-                    })
-                    used_indices.update(combo_indices)
-                    found = True
-                    break
+    # 自動計算結果
+    if any(stone_weights) and any([r[col_pcs] for r in package_rules]):
+        results = calc_results(stone_weights, package_rules, tolerance, col_pcs, col_weight, col_ref, assigned_stones_label, no_match)
 
-            if not found:
-                results.append({
-                    col_ref: pack_id,
-                    assigned_stones_label: no_match,
-                    col_weight: "-"
+elif mode == upload_label:
+    stone_file = st.file_uploader(upload_label, type=["xlsx"], key="stone")
+    package_file = st.file_uploader(package_label, type=["xlsx"], key="package")
+    st.markdown("---")
+    tolerance = st.number_input("容許誤差 (ct) / Tolerance", value=st.session_state["tolerance"], step=0.001, format="%.3f", key="tolerance")
+    st.session_state["tolerance"] = tolerance
+
+    if stone_file and package_file:
+        try:
+            stones_df = pd.read_excel(stone_file)
+            packages_df = pd.read_excel(package_file)
+            stones = stones_df[col_weight].tolist()
+            package_rules = []
+            for idx, row in packages_df.iterrows():
+                package_rules.append({
+                    col_pcs: int(row[col_pcs]),
+                    col_weight: float(row[col_weight]),
+                    col_ref: str(row[col_ref]) if pd.notnull(row[col_ref]) and str(row[col_ref]).strip() else str(idx+1)
                 })
+            results = calc_results(stones, package_rules, tolerance, col_pcs, col_weight, col_ref, assigned_stones_label, no_match)
+        except Exception as e:
+            st.error(error_label)
+    else:
+        st.info(info_label)
 
 # 顯示結果與下載
 if results:
