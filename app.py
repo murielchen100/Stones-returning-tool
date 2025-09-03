@@ -30,7 +30,7 @@ if lang == "中文":
     diff_label = "差異值"
 else:
     st.header("💎 Stones Returning Optimizer")
-    st.markdown('<div style="font-size:12px; color:gray; margin-bottom:10px;">by Muriel</div>', unsafe_allow_html=True)
+    st.markdown('<div style="font-size:16px; color:green; margin-bottom:10px;">by Muriel</div>', unsafe_allow_html=True)
     mode_label = "Select input mode"
     upload_label = "Upload stones weights Excel"
     package_label = "Upload packs info Excel"
@@ -125,21 +125,21 @@ if mode == keyin_label:
     clear_stones = st.button(clear_all_label, key="clear_stones")
     stone_weights = []
     for row in range(6):  # 6 rows x 5 cols = 30
-    cols = st.columns(5)
-    for col in range(5):
-        idx = row * 5 + col
-        if idx < 30:
-            with cols[col]:
-                st.write(f"{idx+1}.", inline=True)
-                if clear_stones:
-                    st.session_state[f"stone_{idx}"] = ""
-                raw_val = st.text_input(
-                    "", value=st.session_state.get(f"stone_{idx}", ""), key=f"stone_{idx}", label_visibility="collapsed", max_chars=10
-                )
-                val = limit_3_decimal(raw_val)
-                if val != raw_val:
-                    st.session_state[f"stone_{idx}"] = val
-                stone_weights.append(safe_float(val))
+        cols = st.columns(5)
+        for col in range(5):
+            idx = row * 5 + col
+            if idx < 30:
+                with cols[col]:
+                    st.write(f"{idx+1}.", inline=True)
+                    if clear_stones:
+                        st.session_state[f"stone_{idx}"] = ""
+                    raw_val = st.text_input(
+                        "", value=st.session_state.get(f"stone_{idx}", ""), key=f"stone_{idx}", label_visibility="collapsed", max_chars=10
+                    )
+                    val = limit_3_decimal(raw_val)
+                    if val != raw_val:
+                        st.session_state[f"stone_{idx}"] = val
+                    stone_weights.append(safe_float(val))
 
     st.markdown("---")
     st.subheader(rule_label)
@@ -255,4 +255,3 @@ if results:
         file_name="result.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
-
