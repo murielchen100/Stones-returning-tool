@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import itertools
 import io
-import re
 
 st.set_page_config(page_title="退石最優化計算工具", layout="wide")
 st.image("https://cdn-icons-png.flaticon.com/512/616/616490.png", width=80)
@@ -28,6 +27,8 @@ if lang == "中文":
     assigned_weight_label = "分配重量"
     expected_weight_label = "期望重量"
     diff_label = "差異值"
+    tolerance_label = "容許誤差 (cts)"
+    cts_label = "cts"
 else:
     st.header("💎 Stones Returning Optimizer")
     st.markdown('<div style="font-size:18px; color:green; margin-bottom:10px;">by Muriel</div>', unsafe_allow_html=True)
@@ -47,6 +48,8 @@ else:
     assigned_weight_label = "Assigned Weight"
     expected_weight_label = "Expected Weight"
     diff_label = "Difference"
+    tolerance_label = "Tolerance (cts)"
+    cts_label = "cts"
 
 col_pcs = "pcs"
 col_weight = "cts"
@@ -55,31 +58,6 @@ col_ref = "Ref"
 st.markdown("---")
 
 mode = st.radio(mode_label, [upload_label, keyin_label])
-
-def safe_float(val):
-    try:
-        return float(val)
-    except:
-        return 0.0
-
-def limit_3_decimal(val):
-    # 只允許數字、小數點，且最多3位小數，超過直接截斷
-    match = re.match(r"^(\d+)(\.\d{0,3})?", val)
-    if match:
-        return match.group(1) + (match.group(2) if match.group(2) else "")
-    elif val == "":
-        return ""
-    else:
-        try:
-            f = float(val)
-            s = str(f)
-            if '.' in s:
-                int_part, dec_part = s.split('.')
-                return int_part + '.' + dec_part[:3]
-            else:
-                return s
-        except:
-            return ""
 
 def calc_results(stones, package_rules, tolerance, col_pcs, col_weight, col_ref, assigned_stones_label, assigned_weight_label, expected_weight_label, diff_label, no_match):
     results = []
@@ -121,25 +99,23 @@ results = []
 
 if mode == keyin_label:
     st.subheader(stones_label)
+    st.markdown(f'<span style="font-size:14px; color:gray;">單位：{cts_label}</span>', unsafe_allow_html=True)
     clear_stones = st.button(clear_all_label, key="clear_stones")
     stone_weights = []
     for row in range(6):  # 6 rows x 5 cols = 30
         cols = st.columns(5)
         for col in range(5):
             idx = row * 5 + col
-            if idx < 30:
-                with cols[col]:
-                    st.write(f"{idx+1}.", inline=True)
-                    key = f"stone_{idx}"
-                    if clear_stones:
-                        st.session_state[key] = ""
-                    raw_val = st.text_input(
-                        "", value=st.session_state.get(key, ""), key=key, label_visibility="collapsed", max_chars=10
-                    )
-                    val = limit_3_decimal(raw_val)
-                    if val != raw_val:
-                        st.session_state[key] = val
-                    stone_weights.append(safe_float(val))
+            key = f"stone_{idx}"
+            if clear_stones:
+                st.session_state[key] = 0.0
+            with cols[col]:
+                st.write(f"{idx+1}.", inline=True)
+                val = st.number_input(
+                    cts_label, min_value=0.0, step=0.001, format="%.3f",
+                    key=key, label_visibility="visible"
+                )
+                stone_weights.append(val)
 
     st.markdown("---")
     st.subheader(rule_label)
@@ -150,7 +126,7 @@ if mode == keyin_label:
     with rule_header[1]:
         st.markdown("**pcs**")
     with rule_header[2]:
-        st.markdown("**cts**")
+        st.markdown(f"**{cts_label}**")
     with rule_header[3]:
         st.markdown("**Ref**")
 
@@ -162,21 +138,13 @@ if mode == keyin_label:
         with cols_rule[1]:
             key = f"pcs_{i}"
             if clear_rules:
-                st.session_state[key] = ""
-            pcs_raw = st.text_input("", value=st.session_state.get(key, ""), key=key, label_visibility="collapsed", max_chars=5)
-            pcs_val = limit_3_decimal(pcs_raw)
-            if pcs_val != pcs_raw:
-                st.session_state[key] = pcs_val
-            pcs = int(float(pcs_val)) if pcs_val.replace('.', '', 1).isdigit() and float(pcs_val) > 0 else 1
+                st.session_state[key] = 1
+            pcs = st.number_input("", min_value=1, step=1, key=key, label_visibility="collapsed")
         with cols_rule[2]:
             key = f"weight_{i}"
             if clear_rules:
-                st.session_state[key] = ""
-            weight_raw = st.text_input("", value=st.session_state.get(key, ""), key=key, label_visibility="collapsed", max_chars=10)
-            weight_val = limit_3_decimal(weight_raw)
-            if weight_val != weight_raw:
-                st.session_state[key] = weight_val
-            total_weight = safe_float(weight_val)
+                st.session_state[key] = 0.0
+            total_weight = st.number_input(cts_label, min_value=0.0, step=0.001, format="%.3f", key=key, label_visibility="visible")
         with cols_rule[3]:
             key = f"packid_{i}"
             if clear_rules:
@@ -189,14 +157,10 @@ if mode == keyin_label:
         })
 
     st.markdown("---")
-    tolerance_raw = st.text_input("容許誤差 (ct) / Tolerance", value="0.003", key="tolerance")
-    tolerance_val = limit_3_decimal(tolerance_raw)
-    if tolerance_val != tolerance_raw:
-        st.session_state["tolerance"] = tolerance_val
-    try:
-        tolerance = float(tolerance_val)
-    except:
-        tolerance = 0.003
+    tol_key = "tolerance"
+    if clear_stones or clear_rules:
+        st.session_state[tol_key] = 0.003
+    tolerance = st.number_input(tolerance_label, min_value=0.0, step=0.001, format="%.3f", key=tol_key)
 
     if any(stone_weights) and any([r[col_pcs] for r in package_rules]):
         results = calc_results(
@@ -209,14 +173,7 @@ elif mode == upload_label:
     stone_file = st.file_uploader(upload_label, type=["xlsx"], key="stone")
     package_file = st.file_uploader(package_label, type=["xlsx"], key="package")
     st.markdown("---")
-    tolerance_raw = st.text_input("容許誤差 (ct) / Tolerance", value="0.003", key="tolerance")
-    tolerance_val = limit_3_decimal(tolerance_raw)
-    if tolerance_val != tolerance_raw:
-        st.session_state["tolerance"] = tolerance_val
-    try:
-        tolerance = float(tolerance_val)
-    except:
-        tolerance = 0.003
+    tolerance = st.number_input(tolerance_label, min_value=0.0, step=0.001, format="%.3f", key="tolerance")
 
     if stone_file and package_file:
         try:
