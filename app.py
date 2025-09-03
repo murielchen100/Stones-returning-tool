@@ -410,11 +410,11 @@ def main():
         
         # Create DataFrame and display with custom formatting
         df = pd.DataFrame(results)
-        # Ensure consistent column order
-        columns = [labels["assigned_stones"], labels["assigned_weight"], 
+        # Ensure consistent column order with Ref first
+        columns = [optimizer.col_ref, labels["assigned_stones"], labels["assigned_weight"], 
                    labels["expected_weight"], labels["diff"]]
-        if optimizer.col_ref in df.columns:
-            columns.append(optimizer.col_ref)
+        # Filter out columns that don't exist (e.g., if Ref is not present)
+        columns = [col for col in columns if col in df.columns]
         df = df[columns]
         
         # Apply formatting for better display
@@ -427,7 +427,8 @@ def main():
                     )
             return formatted_df
         
-        st.dataframe(format_dataframe(df), use_container_width=True)
+        # Display DataFrame without index
+        st.dataframe(format_dataframe(df), use_container_width=True, hide_index=True)
         
         # Download functionality
         buffer = io.BytesIO()
@@ -441,5 +442,6 @@ def main():
             file_name="stone_optimization_results.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
+       
 if __name__ == "__main__":
     main()
