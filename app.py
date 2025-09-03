@@ -54,36 +54,27 @@ class StoneOptimizer:
         except (ValueError, TypeError):
             return "0.000"
     
-    def find_best_combination(self, available_stones: list[float], target_count: int, 
-                            target_weight: float, tolerance: float) -> tuple[list[int], float, float] | None:
-        """Find the best combination of stones that matches the target"""
-        best_combo = None
-        best_diff = float('inf')
+    def find_first_combination(self, available_stones: list[float], target_count: int, 
+                            target_weight: float, tolerance: float) -> tuple[list[int], float] | None:
+        """Find the first combination of stones that matches the target within tolerance"""
         
         for combo_indices in itertools.combinations(range(len(available_stones)), target_count):
             combo_weights = [available_stones[i] for i in combo_indices]
             total_weight = sum(combo_weights)
-            truncated_total = math.trunc(total_weight * 1000) / 1000
-            diff = abs(truncated_total - target_weight)
+            diff = abs(total_weight - target_weight)
             
-            if diff <= tolerance and diff < best_diff:
-                best_combo = (list(combo_indices), truncated_total, diff)
-                best_diff = diff
+            if diff <= tolerance:
+                return (list(combo_indices), total_weight)
         
-        return best_combo
+        return None
     
     def calculate_optimal_assignment(self, stones: list[float], package_rules: list[dict], 
                                    tolerance: float, labels: dict[str, str]) -> list[dict]:
         """Calculate optimal stone assignment"""
         results = []
-        available_stones = stones.copy()
         used_indices = set()
         
-        # Sort package rules by weight descending for better matching
-        sorted_rules = sorted(enumerate(package_rules), 
-                            key=lambda x: x[1][self.col_weight], reverse=True)
-        
-        for original_idx, rule in sorted_rules:
+        for rule in package_rules:
             count = int(rule[self.col_pcs])
             target = float(rule[self.col_weight])
             pack_id = rule.get(self.col_ref, "")
@@ -92,11 +83,11 @@ class StoneOptimizer:
             available_indices = [i for i in range(len(stones)) if i not in used_indices]
             available_weights = [stones[i] for i in available_indices]
             
-            # Find best combination
-            best_match = self.find_best_combination(available_weights, count, target, tolerance)
+            # Find first combination
+            first_match = self.find_first_combination(available_weights, count, target, tolerance)
             
-            if best_match:
-                local_indices, total_assigned, diff = best_match
+            if first_match:
+                local_indices, total_assigned = first_match
                 # Convert local indices to global indices
                 global_indices = [available_indices[i] for i in local_indices]
                 combo_weights = [stones[i] for i in global_indices]
@@ -105,7 +96,7 @@ class StoneOptimizer:
                     labels["assigned_stones"]: combo_weights,
                     labels["assigned_weight"]: f"{total_assigned:.3f}",
                     labels["expected_weight"]: f"{target:.3f}",
-                    labels["diff"]: f"{diff:.3f}"
+                    labels["diff"]: f"{abs(total_assigned - target):.3f}"
                 }
                 
                 if pack_id:
@@ -370,25 +361,8 @@ def main():
                     st.error(f"{labels['error_label']}: Missing 'use cts' column for stones")
                     st.stop()
                 
-                # Extract stones from rows where ref, cts, pcs are all NaN
-                stones = []
-                has_ref = "ref" in df.columns
-                for _, row in df.iterrows():
-                    is_blank_row = (
-                        (not has_ref or pd.isnull(row.get("ref"))) and
-                        pd.isnull(row.get("cts")) and
-                        pd.isnull(row.get("pcs"))
-                    )
-                    if is_blank_row:
-                        w = row.get("use cts")
-                        if pd.notnull(w):
-                            w = StoneOptimizer.safe_float(w)
-                            if w > 0:
-                                stones.append(w)
-                
-                # If no stones found in blank rows, fallback to all use cts (optional, can remove if not needed)
-                if not stones:
-                    stones = [StoneOptimizer.safe_float(w) for w in df["use cts"].tolist() if pd.notnull(w) and StoneOptimizer.safe_float(w) > 0]
+                # Extract stones from all rows where use cts is not null
+                stones = [StoneOptimizer.safe_float(row.get("use cts")) for _, row in df.iterrows() if pd.notnull(row.get("use cts")) and StoneOptimizer.safe_float(row.get("use cts")) > 0]
                 
                 # Extract package rules
                 package_rules = []
