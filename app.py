@@ -45,9 +45,6 @@ st.markdown("---")
 
 mode = st.radio(mode_label, [upload_label, keyin_label])
 
-if "tolerance" not in st.session_state:
-    st.session_state["tolerance"] = 0.003
-
 def calc_results(stones, package_rules, tolerance, col_pcs, col_weight, col_ref, assigned_stones_label, no_match):
     results = []
     used_indices = set()
@@ -130,8 +127,8 @@ if mode == keyin_label:
     # 容許誤差在最下方，調整時自動刷新結果
     st.markdown("---")
     tolerance = st.number_input("容許誤差 (ct) / Tolerance", value=st.session_state["tolerance"], step=0.001, format="%.3f", key="tolerance")
-    st.session_state["tolerance"] = tolerance
-
+# 直接這樣寫即可，不要再手動操作 session_state
+tolerance = st.number_input("容許誤差 (ct) / Tolerance", value=0.003, step=0.001, format="%.3f", key="tolerance")
     # 自動計算結果
     if any(stone_weights) and any([r[col_pcs] for r in package_rules]):
         results = calc_results(stone_weights, package_rules, tolerance, col_pcs, col_weight, col_ref, assigned_stones_label, no_match)
