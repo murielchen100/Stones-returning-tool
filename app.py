@@ -17,12 +17,14 @@ if lang == "中文":
     rule_label = "直接輸入分包資訊"
     pcs_label = "顆數"
     weight_label = "總重"
+    packid_label = "用石編號（可不填）"
     result_label = "分配結果"
     download_label = "下載結果 Excel"
     error_label = "請上傳正確的 Excel 檔案"
     tolerance_label = "容許誤差 (ct)"
     info_label = "請上傳檔案或直接輸入資料"
     no_match = "找不到符合組合"
+    start_label = "開始分配"
 else:
     st.header("💎 Stones Returning Optimizer")
     mode_label = "Select input mode"
@@ -32,12 +34,14 @@ else:
     rule_label = "Key in packs info"
     pcs_label = "Pieces"
     weight_label = "Total weight"
+    packid_label = "Pack ID (optional)"
     result_label = "Result"
     download_label = "Download result Excel"
     error_label = "Please upload valid Excel files"
     tolerance_label = "Tolerance (ct)"
     info_label = "Please upload files or key in data"
     no_match = "No match found"
+    start_label = "Start"
 
 st.markdown("---")
 
@@ -60,9 +64,11 @@ if mode == upload_label:
             diamonds = diamonds_df['重量'].tolist()
             used_indices = set()
 
+            # 這裡假設 packages_df 有「用石編號」「顆數」「總重」三個欄位
             for idx, row in packages_df.iterrows():
                 count = int(row['顆數'])
                 target = float(row['總重'])
+                pack_id = str(row['用石編號']) if pd.notnull(row['用石編號']) and str(row['用石編號']).strip() else str(idx+1)
                 found = False
 
                 available = [i for i in range(len(diamonds)) if i not in used_indices]
@@ -70,7 +76,7 @@ if mode == upload_label:
                     combo = [diamonds[i] for i in combo_indices]
                     if abs(sum(combo) - target) <= tolerance:
                         results.append({
-                            "分包編號": row['用石編號'],
+                            "用石編號": pack_id,
                             "分配鑽石": combo,
                             "總重": sum(combo)
                         })
@@ -80,7 +86,7 @@ if mode == upload_label:
 
                 if not found:
                     results.append({
-                        "分包編號": row['用石編號'],
+                        "用石編號": pack_id,
                         "分配鑽石": no_match,
                         "總重": "-"
                     })
@@ -103,19 +109,26 @@ elif mode == keyin_label:
     st.subheader(rule_label)
     package_rules = []
     for i in range(10):
-        col1, col2 = st.columns(2)
+        col1, col2, col3 = st.columns([1, 1, 2])
         with col1:
             pcs = st.number_input(f"第{i+1}包{pcs_label}", min_value=1, step=1, key=f"pcs_{i}")
         with col2:
             total_weight = st.number_input(f"第{i+1}包{weight_label}", min_value=0.0, step=0.001, format="%.3f", key=f"weight_{i}")
-        package_rules.append({"顆數": pcs, "總重": total_weight, "用石編號": i+1})
+        with col3:
+            pack_id = st.text_input(f"第{i+1}包{packid_label}", key=f"packid_{i}")
+        package_rules.append({
+            "顆數": pcs,
+            "總重": total_weight,
+            "用石編號": pack_id.strip() if pack_id.strip() else str(i+1)
+        })
 
-    if st.button("開始分配" if lang == "中文" else "Start"):
+    if st.button(start_label):
         diamonds = diamond_weights
         used_indices = set()
         for idx, rule in enumerate(package_rules):
             count = int(rule['顆數'])
             target = float(rule['總重'])
+            pack_id = rule['用石編號'] if rule['用石編號'] else str(idx+1)
             found = False
 
             available = [i for i in range(len(diamonds)) if i not in used_indices]
@@ -123,7 +136,7 @@ elif mode == keyin_label:
                 combo = [diamonds[i] for i in combo_indices]
                 if abs(sum(combo) - target) <= tolerance:
                     results.append({
-                        "分包編號": rule['用石編號'],
+                        "用石編號": pack_id,
                         "分配鑽石": combo,
                         "總重": sum(combo)
                     })
@@ -133,7 +146,7 @@ elif mode == keyin_label:
 
             if not found:
                 results.append({
-                    "分包編號": rule['用石編號'],
+                    "用石編號": pack_id,
                     "分配鑽石": no_match,
                     "總重": "-"
                 })
