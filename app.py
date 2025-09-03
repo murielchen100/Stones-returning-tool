@@ -92,7 +92,7 @@ def calc_results(stones, package_rules, tolerance, col_pcs, col_weight, col_ref,
     for idx, rule in enumerate(package_rules):
         count = int(rule[col_pcs])
         target = float(rule[col_weight])
-        pack_id = rule[col_ref] if rule[col_ref] else str(idx+1)
+        pack_id = rule.get(col_ref, "")
         found = False
 
         available = [i for i in range(len(stones)) if i not in used_indices]
@@ -101,25 +101,29 @@ def calc_results(stones, package_rules, tolerance, col_pcs, col_weight, col_ref,
             total_assigned = math.trunc(sum(combo) * 1000) / 1000
             diff = math.trunc(abs(total_assigned - target) * 1000) / 1000
             if diff <= tolerance:
-                results.append({
-                    col_ref: pack_id,
+                result_row = {
                     assigned_stones_label: combo,
                     assigned_weight_label: "{:.3f}".format(total_assigned),
                     expected_weight_label: "{:.3f}".format(math.trunc(target * 1000) / 1000),
                     diff_label: "{:.3f}".format(diff)
-                })
+                }
+                if pack_id:
+                    result_row[col_ref] = pack_id
+                results.append(result_row)
                 used_indices.update(combo_indices)
                 found = True
                 break
 
         if not found:
-            results.append({
-                col_ref: pack_id,
+            result_row = {
                 assigned_stones_label: no_match,
                 assigned_weight_label: "-",
                 expected_weight_label: "{:.3f}".format(math.trunc(target * 1000) / 1000),
                 diff_label: "-"
-            })
+            }
+            if pack_id:
+                result_row[col_ref] = pack_id
+            results.append(result_row)
     return results
 
 results = []
@@ -127,35 +131,22 @@ results = []
 if mode == keyin_label:
     st.subheader(stones_label)
     st.markdown(f'<span style="font-size:14px; color:gray;">單位：{cts_label}</span>', unsafe_allow_html=True)
-    clear_stones = st.button(clear_all_label, key="clear_stones")
-    # 清除 session_state
-    if clear_stones:
-        for idx in range(30):
-            st.session_state[f"stone_{idx}"] = ""
+    # 不要顯示過往輸入數字，每次都初始化為空
     stone_weights = []
     for row in range(6):  # 6 rows x 5 cols = 30
         cols = st.columns(5)
         for col in range(5):
             idx = row * 5 + col
-            key = f"stone_{idx}"
-            default_val = "" if clear_stones else st.session_state.get(key, "")
             with cols[col]:
                 st.markdown(f"{idx+1}.", unsafe_allow_html=True)
                 raw_val = st.text_input(
-                    "", value=default_val, key=key, label_visibility="collapsed", max_chars=10, placeholder="0.000"
+                    "", value="", key=f"stone_{idx}_input", label_visibility="collapsed", max_chars=10, placeholder="0.000"
                 )
                 val = valid_3_decimal(raw_val)
                 stone_weights.append(safe_float(val))
 
     st.markdown("---")
     st.subheader(rule_label)
-    clear_rules = st.button(clear_all_label, key="clear_rules")
-    # 清除 session_state
-    if clear_rules:
-        for i in range(10):
-            st.session_state[f"pcs_{i}"] = ""
-            st.session_state[f"weight_{i}"] = ""
-            st.session_state[f"packid_{i}"] = ""
     rule_header = st.columns([0.7, 1.5, 1.5, 2])
     with rule_header[0]:
         st.markdown(" ")
@@ -172,31 +163,26 @@ if mode == keyin_label:
         with cols_rule[0]:
             st.markdown(f"{i+1}")
         with cols_rule[1]:
-            key = f"pcs_{i}"
-            default_val = "" if clear_rules else st.session_state.get(key, "")
-            pcs_raw = st.text_input("", value=default_val, key=key, label_visibility="collapsed", max_chars=5, placeholder="1")
+            pcs_raw = st.text_input("", value="", key=f"pcs_{i}_input", label_visibility="collapsed", max_chars=5, placeholder="1")
             pcs_val = re.sub(r"\D", "", pcs_raw)[:3] if pcs_raw else "1"
             pcs = int(pcs_val) if pcs_val.isdigit() and int(pcs_val) > 0 else 1
         with cols_rule[2]:
-            key = f"weight_{i}"
-            default_val = "" if clear_rules else st.session_state.get(key, "")
-            weight_raw = st.text_input("", value=default_val, key=key, label_visibility="collapsed", max_chars=10, placeholder="0.000")
+            weight_raw = st.text_input("", value="", key=f"weight_{i}_input", label_visibility="collapsed", max_chars=10, placeholder="0.000")
             weight_val = valid_3_decimal(weight_raw)
             total_weight = safe_float(weight_val)
         with cols_rule[3]:
-            key = f"packid_{i}"
-            default_val = "" if clear_rules else st.session_state.get(key, "")
-            pack_id = st.text_input("Ref", value=default_val, key=key, label_visibility="visible", max_chars=20, placeholder="Ref")
-        package_rules.append({
+            pack_id = st.text_input("Ref", value="", key=f"packid_{i}_input", label_visibility="visible", max_chars=20, placeholder="Ref")
+        rule_dict = {
             col_pcs: pcs,
-            col_weight: total_weight,
-            col_ref: pack_id.strip() if pack_id.strip() else str(i+1)
-        })
+            col_weight: total_weight
+        }
+        if pack_id.strip():
+            rule_dict[col_ref] = pack_id.strip()
+        package_rules.append(rule_dict)
 
     st.markdown("---")
     tol_key = "tolerance"
-    default_tol = "" if clear_stones or clear_rules else st.session_state.get(tol_key, "")
-    tolerance_raw = st.text_input(f"{tolerance_label}", value=default_tol, key=tol_key, placeholder="0.003")
+    tolerance_raw = st.text_input(f"{tolerance_label}", value="", key=tol_key, placeholder="0.003")
     tolerance_val = valid_3_decimal(tolerance_raw)
     try:
         tolerance = float(tolerance_val)
@@ -232,18 +218,20 @@ elif mode == upload_label:
             if col_weight not in stones_df.columns:
                 st.error(error_label)
                 st.stop()
-            required_cols = [col_pcs, col_weight, col_ref]
+            required_cols = [col_pcs, col_weight]
             if not all(col in packages_df.columns for col in required_cols):
                 st.error(error_label)
                 st.stop()
             stones = stones_df[col_weight].tolist()
             package_rules = []
             for idx, row in packages_df.iterrows():
-                package_rules.append({
+                rule_dict = {
                     col_pcs: int(row[col_pcs]),
-                    col_weight: float(row[col_weight]),
-                    col_ref: str(row[col_ref]) if pd.notnull(row[col_ref]) and str(row[col_ref]).strip() else str(idx+1)
-                })
+                    col_weight: float(row[col_weight])
+                }
+                if col_ref in packages_df.columns and pd.notnull(row[col_ref]) and str(row[col_ref]).strip():
+                    rule_dict[col_ref] = str(row[col_ref]).strip()
+                package_rules.append(rule_dict)
             results = calc_results(
                 stones, package_rules, tolerance,
                 col_pcs, col_weight, col_ref,
