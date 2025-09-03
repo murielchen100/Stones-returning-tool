@@ -11,7 +11,7 @@ st.image("https://cdn-icons-png.flaticon.com/512/616/616490.png", width=80)
 lang = st.selectbox("選擇語言 / Language", ["中文", "English"])
 if lang == "中文":
     st.header("💎 退石最優化計算工具")
-    st.markdown('<div style="font-size:16px; color:green; margin-bottom:10px;">by Muriel</div>', unsafe_allow_html=True)
+    st.markdown('<div style="font-size:18px; color:green; margin-bottom:10px;">by Muriel</div>', unsafe_allow_html=True)
     mode_label = "選擇輸入方式"
     upload_label = "上傳用石重量 Excel"
     package_label = "上傳分包資訊 Excel"
@@ -30,7 +30,7 @@ if lang == "中文":
     diff_label = "差異值"
 else:
     st.header("💎 Stones Returning Optimizer")
-    st.markdown('<div style="font-size:16px; color:green; margin-bottom:10px;">by Muriel</div>', unsafe_allow_html=True)
+    st.markdown('<div style="font-size:18px; color:green; margin-bottom:10px;">by Muriel</div>', unsafe_allow_html=True)
     mode_label = "Select input mode"
     upload_label = "Upload stones weights Excel"
     package_label = "Upload packs info Excel"
@@ -72,7 +72,6 @@ def limit_3_decimal(val):
     else:
         try:
             f = float(val)
-            # 直接截斷到小數點第三位
             s = str(f)
             if '.' in s:
                 int_part, dec_part = s.split('.')
@@ -132,29 +131,15 @@ if mode == keyin_label:
                 with cols[col]:
                     st.write(f"{idx+1}.", inline=True)
                     key = f"stone_{idx}"
-                    current_val = st.session_state.get(key, "")
+                    if clear_stones:
+                        st.session_state[key] = ""
                     raw_val = st.text_input(
-                        "", value=current_val, key=key, label_visibility="collapsed", max_chars=10
+                        "", value=st.session_state.get(key, ""), key=key, label_visibility="collapsed", max_chars=10
                     )
-                    match = re.match(r"^(\d+)(\.\d{0,3})?", raw_val)
-                    if match:
-                        new_val = match.group(1) + (match.group(2) if match.group(2) else "")
-                    elif raw_val == "":
-                        new_val = ""
-                    else:
-                        try:
-                            f = float(raw_val)
-                            s = str(f)
-                            if '.' in s:
-                                int_part, dec_part = s.split('.')
-                                new_val = int_part + '.' + dec_part[:3]
-                            else:
-                                new_val = s
-                        except:
-                            new_val = ""
-                    if new_val != raw_val:
-                        st.session_state[key] = new_val
-                    stone_weights.append(safe_float(new_val))
+                    val = limit_3_decimal(raw_val)
+                    if val != raw_val:
+                        st.session_state[key] = val
+                    stone_weights.append(safe_float(val))
 
     st.markdown("---")
     st.subheader(rule_label)
@@ -175,25 +160,28 @@ if mode == keyin_label:
         with cols_rule[0]:
             st.markdown(f"{i+1}")
         with cols_rule[1]:
+            key = f"pcs_{i}"
             if clear_rules:
-                st.session_state[f"pcs_{i}"] = ""
-            pcs_raw = st.text_input("", value=st.session_state.get(f"pcs_{i}", ""), key=f"pcs_{i}", label_visibility="collapsed", max_chars=5)
+                st.session_state[key] = ""
+            pcs_raw = st.text_input("", value=st.session_state.get(key, ""), key=key, label_visibility="collapsed", max_chars=5)
             pcs_val = limit_3_decimal(pcs_raw)
             if pcs_val != pcs_raw:
-                st.session_state[f"pcs_{i}"] = pcs_val
+                st.session_state[key] = pcs_val
             pcs = int(float(pcs_val)) if pcs_val.replace('.', '', 1).isdigit() and float(pcs_val) > 0 else 1
         with cols_rule[2]:
+            key = f"weight_{i}"
             if clear_rules:
-                st.session_state[f"weight_{i}"] = ""
-            weight_raw = st.text_input("", value=st.session_state.get(f"weight_{i}", ""), key=f"weight_{i}", label_visibility="collapsed", max_chars=10)
+                st.session_state[key] = ""
+            weight_raw = st.text_input("", value=st.session_state.get(key, ""), key=key, label_visibility="collapsed", max_chars=10)
             weight_val = limit_3_decimal(weight_raw)
             if weight_val != weight_raw:
-                st.session_state[f"weight_{i}"] = weight_val
+                st.session_state[key] = weight_val
             total_weight = safe_float(weight_val)
         with cols_rule[3]:
+            key = f"packid_{i}"
             if clear_rules:
-                st.session_state[f"packid_{i}"] = ""
-            pack_id = st.text_input("", value=st.session_state.get(f"packid_{i}", ""), key=f"packid_{i}", label_visibility="collapsed")
+                st.session_state[key] = ""
+            pack_id = st.text_input("", value=st.session_state.get(key, ""), key=key, label_visibility="collapsed")
         package_rules.append({
             col_pcs: pcs,
             col_weight: total_weight,
@@ -270,3 +258,4 @@ if results:
         file_name="result.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
+
