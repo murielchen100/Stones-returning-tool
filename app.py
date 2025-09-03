@@ -15,9 +15,7 @@ if lang == "中文":
     package_label = "上傳分包資訊 Excel"
     keyin_label = "直接輸入用石重量"
     rule_label = "直接輸入分包資訊"
-    pcs_label = "顆數"
-    weight_label = "總重"
-    packid_label = "用石編號（可不填）"
+    stones_label = "用石"
     result_label = "分配結果"
     download_label = "下載結果 Excel"
     error_label = "請上傳正確的 Excel 檔案"
@@ -25,6 +23,7 @@ if lang == "中文":
     info_label = "請上傳檔案或直接輸入資料"
     no_match = "找不到符合組合"
     start_label = "開始分配"
+    assigned_stones_label = "分配用石"
 else:
     st.header("💎 Stones Returning Optimizer")
     mode_label = "Select input mode"
@@ -32,9 +31,7 @@ else:
     package_label = "Upload packs info Excel"
     keyin_label = "Key in stones weights"
     rule_label = "Key in packs info"
-    pcs_label = "Pieces"
-    weight_label = "Total weight"
-    packid_label = "Pack ID (optional)"
+    stones_label = "Stones"
     result_label = "Result"
     download_label = "Download result Excel"
     error_label = "Please upload valid Excel files"
@@ -42,6 +39,12 @@ else:
     info_label = "Please upload files or key in data"
     no_match = "No match found"
     start_label = "Start"
+    assigned_stones_label = "Assigned stones"
+
+# 表頭欄位（中英文都一樣）
+col_pcs = "pcs"
+col_weight = "cts"
+col_ref = "Ref"
 
 st.markdown("---")
 
@@ -54,31 +57,31 @@ results = []
 
 if mode == upload_label:
     # 上傳檔案模式
-    diamond_file = st.file_uploader(upload_label, type=["xlsx"], key="diamond")
+    stone_file = st.file_uploader(upload_label, type=["xlsx"], key="stone")
     package_file = st.file_uploader(package_label, type=["xlsx"], key="package")
 
-    if diamond_file and package_file:
+    if stone_file and package_file:
         try:
-            diamonds_df = pd.read_excel(diamond_file)
+            stones_df = pd.read_excel(stone_file)
             packages_df = pd.read_excel(package_file)
-            diamonds = diamonds_df['重量'].tolist()
+            stones = stones_df[col_weight].tolist()
             used_indices = set()
 
-            # 這裡假設 packages_df 有「用石編號」「顆數」「總重」三個欄位
+            # 假設 packages_df 有 col_ref, col_pcs, col_weight 三個欄位
             for idx, row in packages_df.iterrows():
-                count = int(row['顆數'])
-                target = float(row['總重'])
-                pack_id = str(row['用石編號']) if pd.notnull(row['用石編號']) and str(row['用石編號']).strip() else str(idx+1)
+                count = int(row[col_pcs])
+                target = float(row[col_weight])
+                pack_id = str(row[col_ref]) if pd.notnull(row[col_ref]) and str(row[col_ref]).strip() else str(idx+1)
                 found = False
 
-                available = [i for i in range(len(diamonds)) if i not in used_indices]
+                available = [i for i in range(len(stones)) if i not in used_indices]
                 for combo_indices in itertools.combinations(available, count):
-                    combo = [diamonds[i] for i in combo_indices]
+                    combo = [stones[i] for i in combo_indices]
                     if abs(sum(combo) - target) <= tolerance:
                         results.append({
-                            "用石編號": pack_id,
-                            "分配鑽石": combo,
-                            "總重": sum(combo)
+                            col_ref: pack_id,
+                            assigned_stones_label: combo,
+                            col_weight: sum(combo)
                         })
                         used_indices.update(combo_indices)
                         found = True
@@ -86,9 +89,9 @@ if mode == upload_label:
 
                 if not found:
                     results.append({
-                        "用石編號": pack_id,
-                        "分配鑽石": no_match,
-                        "總重": "-"
+                        col_ref: pack_id,
+                        assigned_stones_label: no_match,
+                        col_weight: "-"
                     })
         except Exception as e:
             st.error(error_label)
@@ -97,48 +100,56 @@ if mode == upload_label:
 
 elif mode == keyin_label:
     # 直接輸入模式
-    st.subheader(keyin_label)
-    diamond_weights = []
-    cols = st.columns(5)
+    st.subheader(stones_label)
+    # Stones 輸入區：只顯示一次 Stones，下面 1~30 編號
+    st.markdown("**Stones**")
+    st.markdown(" | ".join([str(i+1) for i in range(30)]))
+    stone_weights = []
+    cols = st.columns(30)
     for i in range(30):
-        with cols[i % 5]:
-            weight = st.number_input(f"鑽石{i+1}", min_value=0.0, step=0.001, format="%.3f", key=f"diamond_{i}")
-            diamond_weights.append(weight)
+        with cols[i]:
+            weight = st.number_input("", min_value=0.0, step=0.001, format="%.3f", key=f"stone_{i}")
+            stone_weights.append(weight)
 
     st.markdown("---")
     st.subheader(rule_label)
+    # 分包規則表頭
+    st.markdown(f"|   | {col_pcs} | {col_weight} | {col_ref} |")
+    st.markdown(f"|---|------|------|------|")
     package_rules = []
     for i in range(10):
-        col1, col2, col3 = st.columns([1, 1, 2])
-        with col1:
-            pcs = st.number_input(f"第{i+1}包{pcs_label}", min_value=1, step=1, key=f"pcs_{i}")
-        with col2:
-            total_weight = st.number_input(f"第{i+1}包{weight_label}", min_value=0.0, step=0.001, format="%.3f", key=f"weight_{i}")
-        with col3:
-            pack_id = st.text_input(f"第{i+1}包{packid_label}", key=f"packid_{i}")
+        cols_rule = st.columns([1, 2, 2, 3])
+        with cols_rule[0]:
+            st.markdown(f"**{i+1}**")
+        with cols_rule[1]:
+            pcs = st.number_input("", min_value=1, step=1, key=f"pcs_{i}")
+        with cols_rule[2]:
+            total_weight = st.number_input("", min_value=0.0, step=0.001, format="%.3f", key=f"weight_{i}")
+        with cols_rule[3]:
+            pack_id = st.text_input("", key=f"packid_{i}")
         package_rules.append({
-            "顆數": pcs,
-            "總重": total_weight,
-            "用石編號": pack_id.strip() if pack_id.strip() else str(i+1)
+            col_pcs: pcs,
+            col_weight: total_weight,
+            col_ref: pack_id.strip() if pack_id.strip() else str(i+1)
         })
 
     if st.button(start_label):
-        diamonds = diamond_weights
+        stones = stone_weights
         used_indices = set()
         for idx, rule in enumerate(package_rules):
-            count = int(rule['顆數'])
-            target = float(rule['總重'])
-            pack_id = rule['用石編號'] if rule['用石編號'] else str(idx+1)
+            count = int(rule[col_pcs])
+            target = float(rule[col_weight])
+            pack_id = rule[col_ref] if rule[col_ref] else str(idx+1)
             found = False
 
-            available = [i for i in range(len(diamonds)) if i not in used_indices]
+            available = [i for i in range(len(stones)) if i not in used_indices]
             for combo_indices in itertools.combinations(available, count):
-                combo = [diamonds[i] for i in combo_indices]
+                combo = [stones[i] for i in combo_indices]
                 if abs(sum(combo) - target) <= tolerance:
                     results.append({
-                        "用石編號": pack_id,
-                        "分配鑽石": combo,
-                        "總重": sum(combo)
+                        col_ref: pack_id,
+                        assigned_stones_label: combo,
+                        col_weight: sum(combo)
                     })
                     used_indices.update(combo_indices)
                     found = True
@@ -146,9 +157,9 @@ elif mode == keyin_label:
 
             if not found:
                 results.append({
-                    "用石編號": pack_id,
-                    "分配鑽石": no_match,
-                    "總重": "-"
+                    col_ref: pack_id,
+                    assigned_stones_label: no_match,
+                    col_weight: "-"
                 })
 
 # 顯示結果與下載
