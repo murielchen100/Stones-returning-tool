@@ -23,6 +23,9 @@ if lang == "中文":
     no_match = "找不到符合組合"
     assigned_stones_label = "分配用石"
     clear_all_label = "清除全部"
+    assigned_weight_label = "分配重量"
+    expected_weight_label = "期望重量"
+    diff_label = "差異值"
 else:
     st.header("💎 Stones Returning Optimizer")
     mode_label = "Select input mode"
@@ -38,6 +41,9 @@ else:
     no_match = "No match found"
     assigned_stones_label = "Assigned stones"
     clear_all_label = "Clear all"
+    assigned_weight_label = "Assigned Weight"
+    expected_weight_label = "Expected Weight"
+    diff_label = "Difference"
 
 col_pcs = "pcs"
 col_weight = "cts"
@@ -47,7 +53,7 @@ st.markdown("---")
 
 mode = st.radio(mode_label, [upload_label, keyin_label])
 
-def calc_results(stones, package_rules, tolerance, col_pcs, col_weight, col_ref, assigned_stones_label, no_match):
+def calc_results(stones, package_rules, tolerance, col_pcs, col_weight, col_ref, assigned_stones_label, assigned_weight_label, expected_weight_label, diff_label, no_match):
     results = []
     used_indices = set()
     for idx, rule in enumerate(package_rules):
@@ -59,11 +65,15 @@ def calc_results(stones, package_rules, tolerance, col_pcs, col_weight, col_ref,
         available = [i for i in range(len(stones)) if i not in used_indices]
         for combo_indices in itertools.combinations(available, count):
             combo = [stones[i] for i in combo_indices]
-            if abs(sum(combo) - target) <= tolerance:
+            total_assigned = sum(combo)
+            diff = abs(total_assigned - target)
+            if diff <= tolerance:
                 results.append({
                     col_ref: pack_id,
                     assigned_stones_label: combo,
-                    col_weight: sum(combo)
+                    assigned_weight_label: round(total_assigned, 4),
+                    expected_weight_label: round(target, 4),
+                    diff_label: round(diff, 4)
                 })
                 used_indices.update(combo_indices)
                 found = True
@@ -73,7 +83,9 @@ def calc_results(stones, package_rules, tolerance, col_pcs, col_weight, col_ref,
             results.append({
                 col_ref: pack_id,
                 assigned_stones_label: no_match,
-                col_weight: "-"
+                assigned_weight_label: "-",
+                expected_weight_label: round(target, 4),
+                diff_label: "-"
             })
     return results
 
@@ -94,7 +106,7 @@ if mode == keyin_label:
                     if clear_stones:
                         st.session_state[f"stone_{idx}"] = 0.0
                     weight = st.number_input(
-                        "", min_value=0.0, step=0.001, format="%.3f",
+                        "", min_value=0.0, step=None, format="%.3f",
                         key=f"stone_{idx}", label_visibility="collapsed"
                     )
                     stone_weights.append(weight)
@@ -122,11 +134,11 @@ if mode == keyin_label:
         with cols_rule[1]:
             if clear_rules:
                 st.session_state[f"pcs_{i}"] = 1
-            pcs = st.number_input("", min_value=1, step=1, key=f"pcs_{i}", label_visibility="collapsed")
+            pcs = st.number_input("", min_value=1, step=None, key=f"pcs_{i}", label_visibility="collapsed")
         with cols_rule[2]:
             if clear_rules:
                 st.session_state[f"weight_{i}"] = 0.0
-            total_weight = st.number_input("", min_value=0.0, step=0.001, format="%.3f", key=f"weight_{i}", label_visibility="collapsed")
+            total_weight = st.number_input("", min_value=0.0, step=None, format="%.3f", key=f"weight_{i}", label_visibility="collapsed")
         with cols_rule[3]:
             if clear_rules:
                 st.session_state[f"packid_{i}"] = ""
@@ -143,7 +155,11 @@ if mode == keyin_label:
 
     # 自動計算結果
     if any(stone_weights) and any([r[col_pcs] for r in package_rules]):
-        results = calc_results(stone_weights, package_rules, tolerance, col_pcs, col_weight, col_ref, assigned_stones_label, no_match)
+        results = calc_results(
+            stone_weights, package_rules, tolerance,
+            col_pcs, col_weight, col_ref,
+            assigned_stones_label, assigned_weight_label, expected_weight_label, diff_label, no_match
+        )
 
 elif mode == upload_label:
     stone_file = st.file_uploader(upload_label, type=["xlsx"], key="stone")
@@ -163,7 +179,11 @@ elif mode == upload_label:
                     col_weight: float(row[col_weight]),
                     col_ref: str(row[col_ref]) if pd.notnull(row[col_ref]) and str(row[col_ref]).strip() else str(idx+1)
                 })
-            results = calc_results(stones, package_rules, tolerance, col_pcs, col_weight, col_ref, assigned_stones_label, no_match)
+            results = calc_results(
+                stones, package_rules, tolerance,
+                col_pcs, col_weight, col_ref,
+                assigned_stones_label, assigned_weight_label, expected_weight_label, diff_label, no_match
+            )
         except Exception as e:
             st.error(error_label)
     else:
