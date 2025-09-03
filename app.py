@@ -400,6 +400,7 @@ def main():
                 
             except Exception as e:
                 st.error(f"{labels['error_label']}: {str(e)}")
+                st.stop()
         else:
             st.info(labels["info_label"])
     
@@ -420,6 +421,11 @@ def main():
         # Apply formatting for better display
         def format_dataframe(df):
             formatted_df = df.copy()
+            # Convert lists in assigned_stones to comma-separated strings
+            if labels["assigned_stones"] in formatted_df.columns:
+                formatted_df[labels["assigned_stones"]] = formatted_df[labels["assigned_stones"]].apply(
+                    lambda x: ", ".join(f"{v:.3f}" for v in x) if isinstance(x, list) else x
+                )
             for col in [labels["assigned_weight"], labels["expected_weight"], labels["diff"]]:
                 if col in formatted_df.columns:
                     formatted_df[col] = formatted_df[col].apply(
@@ -427,13 +433,17 @@ def main():
                     )
             return formatted_df
         
-        # Display DataFrame without index
-        st.dataframe(format_dataframe(df), use_container_width=True, hide_index=True)
+        try:
+            # Display DataFrame without index
+            st.dataframe(format_dataframe(df), use_container_width=True, hide_index=True)
+        except Exception as e:
+            st.error(f"Error displaying results: {str(e)}. Please ensure the input data is valid.")
+            st.stop()
         
         # Download functionality
         buffer = io.BytesIO()
         with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
-            df.to_excel(writer, index=False, sheet_name='Results')
+            format_dataframe(df).to_excel(writer, index=False, sheet_name='Results')
         buffer.seek(0)
         
         st.download_button(
