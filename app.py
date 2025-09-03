@@ -135,7 +135,7 @@ def get_language_labels(lang: str) -> dict[str, str]:
         return {
             "header": "💎 退石最優化計算工具",
             "mode_label": "選擇輸入方式",
-            "upload_label": "上傳用石重量 Excel",
+            "upload_label": "上傳 Excel 檔案",
             "package_label": "上傳分包資訊 Excel",
             "keyin_label": "直接輸入用石重量",
             "rule_label": "直接輸入分包資訊",
@@ -158,7 +158,7 @@ def get_language_labels(lang: str) -> dict[str, str]:
         return {
             "header": "💎 Stones Returning Optimizer",
             "mode_label": "Select input mode",
-            "upload_label": "Upload stones weights Excel",
+            "upload_label": "Upload Excel file",
             "package_label": "Upload packs info Excel",
             "keyin_label": "Key in stones weights",
             "rule_label": "Key in packs info",
@@ -333,13 +333,8 @@ def main():
     
     elif mode == labels["upload_label"]:
         # File upload mode
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            stone_file = st.file_uploader(labels["upload_label"], type=["xlsx"], key="stone")
-        
-        with col2:
-            package_file = st.file_uploader(labels["package_label"], type=["xlsx"], key="package")
+        combined_label = "上傳 Excel 檔案" if lang == "中文" else "Upload Excel file"
+        combined_file = st.file_uploader(combined_label, type=["xlsx"], key="combined")
         
         st.markdown("---")
         
@@ -358,39 +353,59 @@ def main():
         st.markdown(f'<div style="text-align:right; color:gray; font-size:14px;">{labels["cts"]}</div>', 
                     unsafe_allow_html=True)
         
-        if stone_file and package_file:
+        if combined_file:
             try:
-                # Load Excel files
-                stones_df = pd.read_excel(stone_file)
-                packages_df = pd.read_excel(package_file)
+                # Load Excel file
+                df = pd.read_excel(combined_file)
+                df.columns = df.columns.str.lower()
                 
-                # Normalize column names to lowercase
-                stones_df.columns = stones_df.columns.str.lower()
-                packages_df.columns = packages_df.columns.str.lower()
-                
-                # Validate columns
-                if "cts" not in stones_df.columns:
-                    st.error(f"{labels['error_label']}: Missing 'cts' column in stones file")
-                    st.stop()
-                
+                # Validate required columns for packages
                 required_cols = ["pcs", "cts"]
-                if not all(col in packages_df.columns for col in required_cols):
-                    st.error(f"{labels['error_label']}: Missing required columns {required_cols} in packages file")
+                if not all(col in df.columns for col in required_cols):
+                    st.error(f"{labels['error_label']}: Missing required columns {required_cols}")
                     st.stop()
                 
-                # Extract data
-                stones = [float(w) for w in stones_df["cts"].tolist() if pd.notnull(w) and float(w) > 0]
+                # Validate use cts for stones
+                if "use cts" not in df.columns:
+                    st.error(f"{labels['error_label']}: Missing 'use cts' column for stones")
+                    st.stop()
                 
+                # Extract stones from rows where ref, cts, pcs are all NaN
+                stones = []
+                has_ref = "ref" in df.columns
+                for _, row in df.iterrows():
+                    is_blank_row = (
+                        (not has_ref or pd.isnull(row.get("ref"))) and
+                        pd.isnull(row.get("cts")) and
+                        pd.isnull(row.get("pcs"))
+                    )
+                    if is_blank_row:
+                        w = row.get("use cts")
+                        if pd.notnull(w):
+                            w = StoneOptimizer.safe_float(w)
+                            if w > 0:
+                                stones.append(w)
+                
+                # If no stones found in blank rows, fallback to all use cts (optional, can remove if not needed)
+                if not stones:
+                    stones = [StoneOptimizer.safe_float(w) for w in df["use cts"].tolist() if pd.notnull(w) and StoneOptimizer.safe_float(w) > 0]
+                
+                # Extract package rules
                 package_rules = []
-                for _, row in packages_df.iterrows():
-                    if pd.notnull(row["pcs"]) and pd.notnull(row["cts"]) and row["pcs"] > 0 and row["cts"] > 0:
-                        rule_dict = {
-                            "pcs": int(row["pcs"]),
-                            "cts": float(row["cts"])
-                        }
-                        if "ref" in packages_df.columns and pd.notnull(row["ref"]) and str(row["ref"]).strip():
-                            rule_dict["Ref"] = str(row["ref"]).strip()
-                        package_rules.append(rule_dict)
+                for _, row in df.iterrows():
+                    pcs = row.get("pcs")
+                    target_cts = row.get("cts")
+                    if pd.notnull(pcs) and pd.notnull(target_cts):
+                        pcs = StoneOptimizer.safe_float(pcs)
+                        target_cts = StoneOptimizer.safe_float(target_cts)
+                        if pcs > 0 and target_cts > 0:
+                            rule_dict = {
+                                "pcs": int(pcs),
+                                "cts": target_cts
+                            }
+                            if "ref" in df.columns and pd.notnull(row["ref"]) and str(row["ref"]).strip():
+                                rule_dict["Ref"] = str(row["ref"]).strip()
+                            package_rules.append(rule_dict)
                 
                 # Check for valid input
                 if not stones or not package_rules:
