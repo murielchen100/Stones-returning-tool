@@ -129,7 +129,7 @@ def get_language_labels(lang: str) -> dict[str, str]:
             "upload_label": "上傳 Excel 檔案",
             "package_label": "上傳分包資訊 Excel",
             "keyin_label": "直接輸入用石重量",
-            "rule_label": "分包資訊 ",
+            "rule_label": "分包資訊 packs info",
             "stones_label": "用石",
             "result_label": "分配結果",
             "download_label": "下載結果 Excel",
@@ -153,7 +153,7 @@ def get_language_labels(lang: str) -> dict[str, str]:
             "upload_label": "Upload Excel file",
             "package_label": "Upload packs info Excel",
             "keyin_label": "Key in stones weights",
-            "rule_label": "packs info",
+            "rule_label": "分包資訊 packs info",
             "stones_label": "Stones",
             "result_label": "Result",
             "download_label": "Download result Excel",
@@ -178,12 +178,12 @@ def create_stone_input_grid(labels: dict[str, str]) -> list[float]:
                 unsafe_allow_html=True)
     
     if st.button(labels["clear_all"], key="clear_stones"):
-        for idx in range(50):
+        for idx in range(100):
             st.session_state[f"stone_{idx}"] = ""
         st.rerun()
     
     stone_weights = []
-    for row in range(6):  # 6 rows x 5 cols = 30 inputs
+    for row in range(20):  # 20 rows x 5 cols = 100 inputs
         cols = st.columns(5)
         for col in range(5):
             idx = row * 5 + col
@@ -193,7 +193,7 @@ def create_stone_input_grid(labels: dict[str, str]) -> list[float]:
                     "", 
                     key=f"stone_{idx}", 
                     label_visibility="collapsed", 
-                    max_chars=20, 
+                    max_chars=10, 
                     placeholder="0.000"
                 )
                 val = StoneOptimizer.valid_3_decimal(raw_val)
@@ -208,7 +208,7 @@ def create_package_rules_input(labels: dict[str, str]) -> list[dict]:
     st.subheader(labels["rule_label"])
     
     if st.button(labels["clear_all"], key="clear_rules"):
-        for i in range(10):
+        for i in range(30):
             st.session_state[f"pcs_{i}"] = ""
             st.session_state[f"weight_{i}"] = ""
             st.session_state[f"packid_{i}"] = ""
@@ -226,7 +226,7 @@ def create_package_rules_input(labels: dict[str, str]) -> list[dict]:
         st.markdown("**Ref**")
     
     package_rules = []
-    for i in range(10):
+    for i in range(30):
         cols_rule = st.columns([0.7, 1.5, 1.5, 2])
         
         with cols_rule[0]:
