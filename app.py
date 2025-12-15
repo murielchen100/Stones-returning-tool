@@ -178,7 +178,7 @@ def create_stone_input_grid(labels: dict[str, str]) -> list[float]:
                 unsafe_allow_html=True)
     
     if st.button(labels["clear_all"], key="clear_stones"):
-        for idx in range(30):
+        for idx in range(50):
             st.session_state[f"stone_{idx}"] = ""
         st.rerun()
     
@@ -193,7 +193,7 @@ def create_stone_input_grid(labels: dict[str, str]) -> list[float]:
                     "", 
                     key=f"stone_{idx}", 
                     label_visibility="collapsed", 
-                    max_chars=10, 
+                    max_chars=20, 
                     placeholder="0.000"
                 )
                 val = StoneOptimizer.valid_3_decimal(raw_val)
