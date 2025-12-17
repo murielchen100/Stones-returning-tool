@@ -10,8 +10,6 @@ st.set_page_config(page_title="退石最優化計算工具", layout="wide")
 st.image("https://cdn-icons-png.flaticon.com/512/616/616490.png", width=80)
 
 class StoneOptimizer:
-    """Class to handle stone optimization calculations"""
-    
     def __init__(self):
         self.col_pcs = "pcs"
         self.col_weight = "cts"
@@ -40,7 +38,6 @@ class StoneOptimizer:
         except (ValueError, TypeError):
             return ""
     
-    # 精確窮舉模式（僅用於 pcs <= 50）
     def find_exact_combination(self, available_stones: list[float], target_count: int, 
                                target_weight: float, tolerance: float) -> tuple[list[int], float] | None:
         for combo_indices in itertools.combinations(range(len(available_stones)), target_count):
@@ -50,13 +47,11 @@ class StoneOptimizer:
                 return (list(combo_indices), total_weight)
         return None
     
-    # Greedy 近似模式（快速，適用大 pcs）
     def find_greedy_combination(self, available_stones: list[float], target_count: int, 
                                 target_weight: float, tolerance: float) -> tuple[list[int], float] | None:
         if target_count == 0:
             return [], 0.0
         
-        # 按重量從大到小排序
         indexed_stones = sorted(enumerate(available_stones), key=lambda x: x[1], reverse=True)
         selected_indices = []
         current_total = 0.0
@@ -64,7 +59,6 @@ class StoneOptimizer:
         for idx, weight in indexed_stones:
             if len(selected_indices) >= target_count:
                 break
-            # 暫時加入這顆石頭
             temp_total = current_total + weight
             temp_count = len(selected_indices) + 1
             
@@ -73,11 +67,9 @@ class StoneOptimizer:
                     selected_indices.append(idx)
                     return selected_indices, temp_total
             
-            # 只要還沒滿，就先加進去（greedy 策略）
             selected_indices.append(idx)
             current_total = temp_total
         
-        # 如果剛好湊滿但誤差仍大於 tolerance，回傳 None
         if len(selected_indices) == target_count and abs(current_total - target_weight) <= tolerance:
             return selected_indices, current_total
         
@@ -89,7 +81,6 @@ class StoneOptimizer:
         results = []
         used_indices = set()
         
-        # 進度條準備
         progress_bar = st.progress(0)
         progress_text = st.empty()
         total_packages = len(package_rules)
@@ -99,7 +90,6 @@ class StoneOptimizer:
             target = float(rule[self.col_weight])
             pack_id = rule.get(self.col_ref, "")
             
-            # 更新進度
             progress_text.text(f"正在處理分包 {idx+1}/{total_packages}: {pack_id or f'第{idx+1}包'} (pcs={count})")
             progress_bar.progress((idx + 1) / total_packages)
             
@@ -139,7 +129,6 @@ class StoneOptimizer:
                     result_row[self.col_ref] = pack_id
                 results.append(result_row)
         
-        # 完成後清除進度條
         progress_bar.empty()
         progress_text.empty()
         
@@ -272,7 +261,6 @@ def main():
     st.markdown('<div style="font-size:18px; color:green; margin-bottom:10px;">by Muriel</div>', unsafe_allow_html=True)
     st.markdown("---")
     
-    # 修正這一行：加上遺失的閉括號
     mode = st.radio(labels["mode_label"], [labels["upload_label"], labels["keyin_label"]])
     
     optimizer = StoneOptimizer()
@@ -330,21 +318,16 @@ def main():
                     st.error(f"{labels['error_label']}: Missing 'use cts' column")
                     st.stop()
                 
-                has_ref = "ref" in df.columns
+                # === 關鍵修改：自動取所有 use cts >0 的值作為石頭，無論在哪一行 ===
                 stones = []
                 for _, row in df.iterrows():
-                    is_blank = (
-                        (not has_ref or pd.isnull(row.get("ref"))) and
-                        pd.isnull(row.get("cts")) and
-                        pd.isnull(row.get("pcs"))
-                    )
-                    if is_blank:
-                        w = row.get("use cts")
-                        if pd.notnull(w):
-                            w_val = StoneOptimizer.safe_float(w)
-                            if w_val > 0:
-                                stones.append(w_val)
+                    w = row.get("use cts")
+                    if pd.notnull(w):
+                        w_val = StoneOptimizer.safe_float(w)
+                        if w_val > 0:
+                            stones.append(w_val)
                 
+                # 提取分包規則（維持原邏輯）
                 package_rules = []
                 for _, row in df.iterrows():
                     pcs = row.get("pcs")
