@@ -56,7 +56,7 @@ class StoneOptimizer:
         if n < target_count:
             return None
         
-        # Step 1: Greedy 初始解（从小到大，適合多小石拼小總重）
+        # Greedy 初始解（从小到大）
         indexed = sorted(enumerate(available_stones), key=lambda x: x[1])
         selected = [idx for idx, _ in indexed[:target_count]]
         current_total = sum(available_stones[i] for i in selected)
@@ -69,7 +69,7 @@ class StoneOptimizer:
         best_total = current_total
         best_diff = current_diff
         
-        # Step 2: 局部搜尋 - 替換 1 顆石頭優化
+        # 局部搜尋優化
         improved = True
         iterations = 0
         max_iterations = 200
@@ -106,7 +106,7 @@ class StoneOptimizer:
     
     def calculate_optimal_assignment(self, stones: list[float], package_rules: list[dict], 
                                      tolerance: float, labels: dict[str, str], 
-                                     use_greedy: bool = False) -> list[dict]:
+                                     use_greedy: bool = False) -> tuple[list[dict], list[float]]:
         results = []
         used_indices = set()
         
@@ -161,7 +161,11 @@ class StoneOptimizer:
         progress_bar.empty()
         progress_text.empty()
         
-        return results
+        # 計算未分配的石頭
+        remaining_stones = [stones[i] for i in range(len(stones)) if i not in used_indices]
+        remaining_stones.sort()  # 小到大排序，便於查看
+        
+        return results, remaining_stones
 
 def get_language_labels(lang: str) -> dict[str, str]:
     if lang == "中文":
@@ -185,7 +189,10 @@ def get_language_labels(lang: str) -> dict[str, str]:
             "cts": "cts",
             "invalid_input": "請輸入有效數字（非負數）",
             "no_data": "請至少輸入一個有效用石重量和分包規則",
-            "clear_all": "清除全部"
+            "clear_all": "清除全部",
+            "stats_allocated": "已成功分配石頭",
+            "stats_remaining": "未分配石頭",
+            "stats_remaining_list": "未分配石頭重量（由小到大）"
         }
     else:
         return {
@@ -208,8 +215,13 @@ def get_language_labels(lang: str) -> dict[str, str]:
             "cts": "cts",
             "invalid_input": "Please enter valid numbers (non-negative)",
             "no_data": "Please provide at least one valid stone weight and package rule",
-            "clear_all": "Clear all"
+            "clear_all": "Clear all",
+            "stats_allocated": "Successfully allocated stones",
+            "stats_remaining": "Unallocated stones",
+            "stats_remaining_list": "Unallocated stone weights (sorted ascending)"
         }
+
+# 輸入函數保持不變（create_stone_input_grid, create_package_rules_input）
 
 def create_stone_input_grid(labels: dict[str, str]) -> list[float]:
     st.subheader(labels["stones_label"])
@@ -292,6 +304,7 @@ def main():
     
     optimizer = StoneOptimizer()
     results = []
+    remaining_stones = []
     
     if mode == labels["keyin_label"]:
         stone_weights = create_stone_input_grid(labels)
@@ -311,7 +324,7 @@ def main():
             max_pcs = max(rule["pcs"] for rule in package_rules)
             use_greedy = max_pcs > 5
             
-            results = optimizer.calculate_optimal_assignment(
+            results, remaining_stones = optimizer.calculate_optimal_assignment(
                 [w for w in stone_weights if w > 0],
                 package_rules,
                 tolerance,
@@ -343,7 +356,7 @@ def main():
                     st.error(f"{labels['error_label']}: Missing 'use cts' column")
                     st.stop()
                 
-                # 關鍵：取所有 use cts > 0 的值作為可用石頭（總共 81 顆，包括前 11 行）
+                # 取所有 use cts > 0 的值作為可用石頭（總 81 顆）
                 stones = []
                 for _, row in df.iterrows():
                     w = row.get("use cts")
@@ -372,7 +385,7 @@ def main():
                     max_pcs = max(rule["pcs"] for rule in package_rules)
                     use_greedy = max_pcs > 5
                     
-                    results = optimizer.calculate_optimal_assignment(stones, package_rules, tolerance, labels, use_greedy=use_greedy)
+                    results, remaining_stones = optimizer.calculate_optimal_assignment(stones, package_rules, tolerance, labels, use_greedy=use_greedy)
                     
             except Exception as e:
                 st.error(f"{labels['error_label']}: {str(e)}")
@@ -403,6 +416,23 @@ def main():
         
         st.dataframe(format_dataframe(df_result), use_container_width=True, hide_index=True)
         
+        # 新增統計資訊
+        st.markdown("---")
+        st.subheader("分配統計")
+        
+        total_stones = len(stones) if 'stones' in locals() else len([w for w in stone_weights if w > 0])
+        allocated_count = total_stones - len(remaining_stones)
+        
+        st.success(f"**{labels['stats_allocated']}：{allocated_count} 顆**")
+        st.info(f"**{labels['stats_remaining']}：{len(remaining_stones)} 顆**")
+        
+        if remaining_stones:
+            remaining_str = ", ".join(f"{w:.3f}" for w in remaining_stones)
+            st.caption(f"{labels['stats_remaining_list']}：{remaining_str}")
+        else:
+            st.caption("所有石頭皆已成功分配！🎉")
+        
+        # 下載按鈕
         buffer = io.BytesIO()
         with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
             format_dataframe(df_result).to_excel(writer, index=False, sheet_name='Results')
