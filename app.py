@@ -67,10 +67,8 @@ class StoneOptimizer:
             if not remaining:
                 break
             
-            # 計算目前平均
             current_avg = current_total / len(selected) if selected else target_weight / target_count
             
-            # 選與平均最接近的
             best_idx = None
             best_diff = float('inf')
             best_weight = 0.0
@@ -137,8 +135,11 @@ class StoneOptimizer:
         results = []
         used_indices = set()
         
-        # 需求1：從 pcs 最小的分包先分配
+        # 從 pcs 最小的分包先分配
         package_rules = sorted(package_rules, key=lambda x: x["pcs"])
+        
+        # 计算平均 pcs， 用于动态 tolerance
+        avg_pcs = sum(rule["pcs"] for rule in package_rules) / len(package_rules) if package_rules else 1
         
         progress_bar = st.progress(0)
         progress_text = st.empty()
@@ -149,6 +150,9 @@ class StoneOptimizer:
             target = float(rule[self.col_weight])
             pack_id = rule.get(self.col_ref, "")
             
+            # 新條件：動態 tolerance，pcs 多誤差大，pcs 少誤差小
+            dynamic_tolerance = tolerance * (count / avg_pcs)
+            
             progress_text.text(f"正在處理分包 {idx+1}/{total_packages}: {pack_id or f'第{idx+1}包'} (pcs={count})")
             progress_bar.progress((idx + 1) / total_packages)
             
@@ -157,9 +161,9 @@ class StoneOptimizer:
             
             match = None
             if use_greedy or count > 5:
-                match = self.find_greedy_with_local_search(available_weights, count, target, tolerance)
+                match = self.find_greedy_with_local_search(available_weights, count, target, dynamic_tolerance)
             else:
-                match = self.find_exact_combination(available_weights, count, target, tolerance)
+                match = self.find_exact_combination(available_weights, count, target, dynamic_tolerance)
             
             if match:
                 local_indices, total_assigned = match
@@ -456,9 +460,18 @@ def main():
         else:
             st.caption("所有石頭皆已成功分配！🎉")
         
+        # 下載按鈕 - 新增統計到 Excel 的 Statistics sheet
         buffer = io.BytesIO()
         with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
             format_dataframe(df_result).to_excel(writer, index=False, sheet_name='Results')
+            
+            # 新增 Statistics sheet
+            stats_df = pd.DataFrame({
+                '統計項目': [labels['stats_allocated'], labels['stats_remaining'], labels['stats_remaining_list']],
+                '值': [allocated_count, len(remaining_stones), ", ".join(f"{w:.3f}" for w in remaining_stones) if remaining_stones else "無"]
+            })
+            stats_df.to_excel(writer, index=False, sheet_name='Statistics')
+        
         buffer.seek(0)
         
         st.download_button(
