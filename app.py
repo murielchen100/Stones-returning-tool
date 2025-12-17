@@ -47,29 +47,35 @@ class StoneOptimizer:
                 return (list(combo_indices), total_weight)
         return None
     
-    def find_greedy_combination(self, available_stones: list[float], target_count: int, 
+        def find_greedy_combination(self, available_stones: list[float], target_count: int, 
                                 target_weight: float, tolerance: float) -> tuple[list[int], float] | None:
         if target_count == 0:
             return [], 0.0
         
-        indexed_stones = sorted(enumerate(available_stones), key=lambda x: x[1], reverse=True)
+        # 關鍵修改：從小到大排序，優先選小石頭
+        indexed_stones = sorted(enumerate(available_stones), key=lambda x: x[1])  # 改成升序（小→大）
+        
         selected_indices = []
         current_total = 0.0
         
         for idx, weight in indexed_stones:
             if len(selected_indices) >= target_count:
                 break
+            
             temp_total = current_total + weight
             temp_count = len(selected_indices) + 1
             
+            # 如果加這顆剛好湊滿，檢查誤差
             if temp_count == target_count:
                 if abs(temp_total - target_weight) <= tolerance:
                     selected_indices.append(idx)
                     return selected_indices, temp_total
             
+            # 繼續加（因為我們要的是小石頭湊精確）
             selected_indices.append(idx)
             current_total = temp_total
         
+        # 最後檢查是否正好湊滿且誤差在範圍內
         if len(selected_indices) == target_count and abs(current_total - target_weight) <= tolerance:
             return selected_indices, current_total
         
