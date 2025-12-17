@@ -138,7 +138,6 @@ class StoneOptimizer:
         # 從 pcs 最小的分包先分配
         package_rules = sorted(package_rules, key=lambda x: x["pcs"])
         
-        # 计算平均 pcs， 用于动态 tolerance
         avg_pcs = sum(rule["pcs"] for rule in package_rules) / len(package_rules) if package_rules else 1
         
         progress_bar = st.progress(0)
@@ -150,7 +149,6 @@ class StoneOptimizer:
             target = float(rule[self.col_weight])
             pack_id = rule.get(self.col_ref, "")
             
-            # 新條件：動態 tolerance，pcs 多誤差大，pcs 少誤差小
             dynamic_tolerance = tolerance * (count / avg_pcs)
             
             progress_text.text(f"正在處理分包 {idx+1}/{total_packages}: {pack_id or f'第{idx+1}包'} (pcs={count})")
@@ -336,6 +334,7 @@ def main():
     optimizer = StoneOptimizer()
     results = []
     remaining_stones = []
+    stones = []  # 用於統計總石頭數
     
     if mode == labels["keyin_label"]:
         stone_weights = create_stone_input_grid(labels)
@@ -349,14 +348,16 @@ def main():
             st.warning(labels["invalid_input"], icon="⚠️")
         tolerance = StoneOptimizer.safe_float(tolerance_val) or 0.003
         
-        if not any(w > 0 for w in stone_weights) or not package_rules:
+        stones = [w for w in stone_weights if w > 0]  # 有效石頭
+        
+        if not stones or not package_rules:
             st.warning(labels["no_data"], icon="⚠️")
         else:
             max_pcs = max(rule["pcs"] for rule in package_rules)
             use_greedy = max_pcs > 5
             
             results, remaining_stones = optimizer.calculate_optimal_assignment(
-                [w for w in stone_weights if w > 0],
+                stones,
                 package_rules,
                 tolerance,
                 labels,
@@ -422,6 +423,7 @@ def main():
         else:
             st.info(labels["info_label"])
     
+    # 統一顯示結果與統計（兩種模式都一樣）
     if results:
         st.markdown("---")
         st.subheader(labels["result_label"])
@@ -448,7 +450,7 @@ def main():
         st.markdown("---")
         st.subheader("分配統計")
         
-        total_stones = len(stones) if 'stones' in locals() else len([w for w in stone_weights if w > 0])
+        total_stones = len(stones)
         allocated_count = total_stones - len(remaining_stones)
         
         st.success(f"**{labels['stats_allocated']}：{allocated_count} 顆**")
@@ -460,12 +462,11 @@ def main():
         else:
             st.caption("所有石頭皆已成功分配！🎉")
         
-        # 下載按鈕 - 新增統計到 Excel 的 Statistics sheet
+        # 下載按鈕（兩種模式都顯示，內容完全相同）
         buffer = io.BytesIO()
         with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
             format_dataframe(df_result).to_excel(writer, index=False, sheet_name='Results')
             
-            # 新增 Statistics sheet
             stats_df = pd.DataFrame({
                 '統計項目': [labels['stats_allocated'], labels['stats_remaining'], labels['stats_remaining_list']],
                 '值': [allocated_count, len(remaining_stones), ", ".join(f"{w:.3f}" for w in remaining_stones) if remaining_stones else "無"]
