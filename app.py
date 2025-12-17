@@ -56,7 +56,6 @@ class StoneOptimizer:
         if n < target_count:
             return None
         
-        # 初始 Greedy：从小到大排序
         remaining = list(enumerate(available_stones))
         remaining.sort(key=lambda x: x[1])
         
@@ -96,7 +95,6 @@ class StoneOptimizer:
         best_total = current_total
         best_diff = current_diff
         
-        # 局部搜尋
         for _ in range(200):
             improved = False
             for i in range(len(best_selected)):
@@ -135,7 +133,6 @@ class StoneOptimizer:
         results = []
         used_indices = set()
         
-        # 從 pcs 最小的分包先分配
         package_rules = sorted(package_rules, key=lambda x: x["pcs"])
         
         avg_pcs = sum(rule["pcs"] for rule in package_rules) / len(package_rules) if package_rules else 1
@@ -223,7 +220,8 @@ def get_language_labels(lang: str) -> dict[str, str]:
             "clear_all": "清除全部",
             "stats_allocated": "已成功分配石頭",
             "stats_remaining": "未分配石頭",
-            "stats_remaining_list": "未分配石頭重量（由小到大）"
+            "stats_remaining_list": "未分配石頭重量（由小到大）",
+            "excel_format_hint": "### Excel 檔案格式需求\n檔案必須包含以下四欄（欄位名稱不區分大小寫）：\n- **ref**：袋子編號（可選，若無則自動編號）\n- **pcs**：該袋所需石頭數量（整數）\n- **cts**：該袋目標總重（小數，例如 1.854）\n- **use cts**：需要分配的石頭重量（所有填入的數值都會被視為可用石頭，包括分包規則行的值）\n\n**範例結構**：\n- 前幾行填分包條件（ref, pcs, cts, use cts 可填可不填）\n- 後續行只填 use cts 作為可用石頭\n所有 use cts > 0 的值都會被納入分配，且石頭不可重複使用。"
         }
     else:
         return {
@@ -249,7 +247,8 @@ def get_language_labels(lang: str) -> dict[str, str]:
             "clear_all": "Clear all",
             "stats_allocated": "Successfully allocated stones",
             "stats_remaining": "Unallocated stones",
-            "stats_remaining_list": "Unallocated stone weights (sorted ascending)"
+            "stats_remaining_list": "Unallocated stone weights (sorted ascending)",
+            "excel_format_hint": "### Excel File Format Requirements\nThe file must contain the following four columns (case-insensitive):\n- **ref**: Package ID (optional, auto-numbered if absent)\n- **pcs**: Number of stones required for the package (integer)\n- **cts**: Target total weight for the package (decimal, e.g., 1.854)\n- **use cts**: Available stone weights to be allocated (all filled values will be treated as available stones)\n\n**Example structure**:\n- First few rows: package rules (ref, pcs, cts, use cts optional)\n- Subsequent rows: only fill use cts as available stones\nAll use cts > 0 values will be included in allocation, and stones cannot be reused."
         }
 
 def create_stone_input_grid(labels: dict[str, str]) -> list[float]:
@@ -334,7 +333,7 @@ def main():
     optimizer = StoneOptimizer()
     results = []
     remaining_stones = []
-    stones = []  # 用於統計總石頭數
+    stones = []
     
     if mode == labels["keyin_label"]:
         stone_weights = create_stone_input_grid(labels)
@@ -348,7 +347,7 @@ def main():
             st.warning(labels["invalid_input"], icon="⚠️")
         tolerance = StoneOptimizer.safe_float(tolerance_val) or 0.003
         
-        stones = [w for w in stone_weights if w > 0]  # 有效石頭
+        stones = [w for w in stone_weights if w > 0]
         
         if not stones or not package_rules:
             st.warning(labels["no_data"], icon="⚠️")
@@ -365,6 +364,9 @@ def main():
             )
     
     elif mode == labels["upload_label"]:
+        # 新增檔案格式說明
+        st.markdown(labels["excel_format_hint"])
+        
         combined_file = st.file_uploader("上傳 Excel 檔案" if lang == "中文" else "Upload Excel file", type=["xlsx"], key="combined")
         st.markdown("---")
         
@@ -423,7 +425,6 @@ def main():
         else:
             st.info(labels["info_label"])
     
-    # 統一顯示結果與統計（兩種模式都一樣）
     if results:
         st.markdown("---")
         st.subheader(labels["result_label"])
@@ -462,7 +463,6 @@ def main():
         else:
             st.caption("所有石頭皆已成功分配！🎉")
         
-        # 下載按鈕（兩種模式都顯示，內容完全相同）
         buffer = io.BytesIO()
         with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
             format_dataframe(df_result).to_excel(writer, index=False, sheet_name='Results')
