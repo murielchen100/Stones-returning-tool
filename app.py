@@ -72,7 +72,7 @@ class StoneOptimizer:
         # Step 2: 局部搜尋 - 替換 1 顆石頭優化
         improved = True
         iterations = 0
-        max_iterations = 200  # 可接受範圍內
+        max_iterations = 200
         
         while improved and iterations < max_iterations:
             improved = False
@@ -92,7 +92,6 @@ class StoneOptimizer:
                     if new_diff < best_diff:
                         if new_diff <= tolerance:
                             return [out_idx if j == i else best_selected[j] for j in range(target_count)], new_total
-                        # 即使超出 tolerance，也更新為更接近的解
                         best_selected[i] = out_idx
                         best_total = new_total
                         best_diff = new_diff
@@ -344,6 +343,7 @@ def main():
                     st.error(f"{labels['error_label']}: Missing 'use cts' column")
                     st.stop()
                 
+                # 關鍵：取所有 use cts > 0 的值作為可用石頭（總共 81 顆，包括前 11 行）
                 stones = []
                 for _, row in df.iterrows():
                     w = row.get("use cts")
@@ -352,6 +352,7 @@ def main():
                         if w_val > 0:
                             stones.append(w_val)
                 
+                # 提取分包規則
                 package_rules = []
                 for _, row in df.iterrows():
                     pcs = row.get("pcs")
