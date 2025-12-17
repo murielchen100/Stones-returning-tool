@@ -46,7 +46,7 @@ class StoneOptimizer:
         for combo_indices in itertools.combinations(range(len(available_stones)), target_count):
             combo_weights = [available_stones[i] for i in combo_indices]
             total_weight = sum(combo_weights)
-            if abs(total_weight - target_weight) <= tolerance:  # 確保 <= tolerance
+            if abs(total_weight - target_weight) <= tolerance:
                 return (list(combo_indices), total_weight)
         return None
     
@@ -69,7 +69,7 @@ class StoneOptimizer:
             temp_count = len(selected_indices) + 1
             
             if temp_count == target_count:
-                if abs(temp_total - target_weight) <= tolerance:  # 確保 <= tolerance
+                if abs(temp_total - target_weight) <= tolerance:
                     selected_indices.append(idx)
                     return selected_indices, temp_total
             
@@ -78,7 +78,7 @@ class StoneOptimizer:
             current_total = temp_total
         
         # 如果剛好湊滿但誤差仍大於 tolerance，回傳 None
-        if len(selected_indices) == target_count and abs(current_total - target_weight) <= tolerance:  # 確保 <= tolerance
+        if len(selected_indices) == target_count and abs(current_total - target_weight) <= tolerance:
             return selected_indices, current_total
         
         return None
@@ -195,7 +195,6 @@ def get_language_labels(lang: str) -> dict[str, str]:
             "greedy_warning": "⚠️ Detected package with pcs > 50, automatically switched to Greedy fast mode (approximate optimal solution)"
         }
 
-# === 其餘輸入函數維持不變（stones 100個, packages 30個）===
 def create_stone_input_grid(labels: dict[str, str]) -> list[float]:
     st.subheader(labels["stones_label"])
     st.markdown(f'<span style="font-size:14px; color:gray;">單位：{labels["cts"]}</span>', unsafe_allow_html=True)
@@ -273,7 +272,8 @@ def main():
     st.markdown('<div style="font-size:18px; color:green; margin-bottom:10px;">by Muriel</div>', unsafe_allow_html=True)
     st.markdown("---")
     
-    mode = st.radio(labels["mode_label"], [labels["upload_label"], labels["keyin_label"])
+    # 修正這一行：加上遺失的閉括號
+    mode = st.radio(labels["mode_label"], [labels["upload_label"], labels["keyin_label"]])
     
     optimizer = StoneOptimizer()
     results = []
@@ -293,7 +293,6 @@ def main():
         if not any(w > 0 for w in stone_weights) or not package_rules:
             st.warning(labels["no_data"], icon="⚠️")
         else:
-            # 檢查是否需要 Greedy
             max_pcs = max(rule["pcs"] for rule in package_rules)
             use_greedy = max_pcs > 50
             if use_greedy:
@@ -331,7 +330,6 @@ def main():
                     st.error(f"{labels['error_label']}: Missing 'use cts' column")
                     st.stop()
                 
-                # 正確提取用石：只取 ref, cts, pcs 皆空的行
                 has_ref = "ref" in df.columns
                 stones = []
                 for _, row in df.iterrows():
@@ -347,7 +345,6 @@ def main():
                             if w_val > 0:
                                 stones.append(w_val)
                 
-                # 提取分包規則
                 package_rules = []
                 for _, row in df.iterrows():
                     pcs = row.get("pcs")
@@ -364,7 +361,6 @@ def main():
                 if not stones or not package_rules:
                     st.warning(labels["no_data"], icon="⚠️")
                 else:
-                    # 檢查是否啟用 Greedy
                     max_pcs = max(rule["pcs"] for rule in package_rules)
                     use_greedy = max_pcs > 50
                     if use_greedy:
@@ -378,7 +374,6 @@ def main():
         else:
             st.info(labels["info_label"])
     
-    # 顯示結果
     if results:
         st.markdown("---")
         st.subheader(labels["result_label"])
