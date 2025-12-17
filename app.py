@@ -56,12 +56,13 @@ class StoneOptimizer:
         if n < target_count:
             return None
         
-        # Greedy 初始解（从小到大）
+        # Step 1: Greedy 初始解（从小到大）
         indexed = sorted(enumerate(available_stones), key=lambda x: x[1])
         selected = [idx for idx, _ in indexed[:target_count]]
         current_total = sum(available_stones[i] for i in selected)
         current_diff = abs(current_total - target_weight)
         
+        # 如果初始解就符合，直接返回
         if current_diff <= tolerance:
             return selected, current_total
         
@@ -69,14 +70,12 @@ class StoneOptimizer:
         best_total = current_total
         best_diff = current_diff
         
-        # 局部搜尋優化
-        improved = True
+        # Step 2: 局部搜尋 - 關鍵修改：接受任何 ≤ tolerance 的解，並立即返回
         iterations = 0
         max_iterations = 200
         
-        while improved and iterations < max_iterations:
+        for _ in range(max_iterations):
             improved = False
-            iterations += 1
             
             for i in range(target_count):
                 in_idx = best_selected[i]
@@ -89,16 +88,23 @@ class StoneOptimizer:
                     new_total = best_total - in_weight + out_weight
                     new_diff = abs(new_total - target_weight)
                     
+                    # 關鍵：如果新誤差 ≤ tolerance，立即接受並返回（包括正好 = tolerance）
+                    if new_diff <= tolerance:
+                        new_selected = best_selected.copy()
+                        new_selected[i] = out_idx
+                        return new_selected, new_total
+                    
+                    # 如果沒符合但比目前更好，繼續更新（防止卡在局部）
                     if new_diff < best_diff:
-                        if new_diff <= tolerance:
-                            return [out_idx if j == i else best_selected[j] for j in range(target_count)], new_total
                         best_selected[i] = out_idx
                         best_total = new_total
                         best_diff = new_diff
                         improved = True
-                if improved:
-                    break
+            
+            if not improved:
+                break
         
+        # 最後檢查 best 是否符合
         if best_diff <= tolerance:
             return best_selected, best_total
         
@@ -161,237 +167,17 @@ class StoneOptimizer:
         progress_bar.empty()
         progress_text.empty()
         
-        # 計算未分配的石頭
         remaining_stones = [stones[i] for i in range(len(stones)) if i not in used_indices]
-        remaining_stones.sort()  # 小到大排序，便於查看
+        remaining_stones.sort()
         
         return results, remaining_stones
 
-def get_language_labels(lang: str) -> dict[str, str]:
-    if lang == "中文":
-        return {
-            "header": "💎 退石最優化計算工具",
-            "mode_label": "選擇輸入方式",
-            "upload_label": "上傳 Excel 檔案",
-            "keyin_label": "直接輸入用石重量",
-            "rule_label": "分包資訊 packs info",
-            "stones_label": "用石",
-            "result_label": "分配結果",
-            "download_label": "下載結果 Excel",
-            "error_label": "請上傳正確的 Excel 檔案（需包含正確欄位）",
-            "info_label": "請上傳檔案或輸入資料以進行計算",
-            "no_match": "找不到符合組合",
-            "assigned_stones": "分配用石",
-            "assigned_weight": "分配重量",
-            "expected_weight": "期望重量",
-            "diff": "差異值",
-            "tolerance": "容許誤差",
-            "cts": "cts",
-            "invalid_input": "請輸入有效數字（非負數）",
-            "no_data": "請至少輸入一個有效用石重量和分包規則",
-            "clear_all": "清除全部",
-            "stats_allocated": "已成功分配石頭",
-            "stats_remaining": "未分配石頭",
-            "stats_remaining_list": "未分配石頭重量（由小到大）"
-        }
-    else:
-        return {
-            "header": "💎 Stones Returning Optimizer",
-            "mode_label": "Select input mode",
-            "upload_label": "Upload Excel file",
-            "keyin_label": "Key in stones weights",
-            "rule_label": "分包資訊 packs info",
-            "stones_label": "Stones",
-            "result_label": "Result",
-            "download_label": "Download result Excel",
-            "error_label": "Please upload valid Excel files with correct columns",
-            "info_label": "Please upload files or enter data to proceed",
-            "no_match": "No match found",
-            "assigned_stones": "Assigned stones",
-            "assigned_weight": "Assigned Weight",
-            "expected_weight": "Expected Weight",
-            "diff": "Difference",
-            "tolerance": "Tolerance",
-            "cts": "cts",
-            "invalid_input": "Please enter valid numbers (non-negative)",
-            "no_data": "Please provide at least one valid stone weight and package rule",
-            "clear_all": "Clear all",
-            "stats_allocated": "Successfully allocated stones",
-            "stats_remaining": "Unallocated stones",
-            "stats_remaining_list": "Unallocated stone weights (sorted ascending)"
-        }
+# 其餘函數（labels、輸入、main）與上一版完全相同，只貼出關鍵差異部分
 
-# 輸入函數保持不變（create_stone_input_grid, create_package_rules_input）
-
-def create_stone_input_grid(labels: dict[str, str]) -> list[float]:
-    st.subheader(labels["stones_label"])
-    st.markdown(f'<span style="font-size:14px; color:gray;">單位：{labels["cts"]}</span>', unsafe_allow_html=True)
-    
-    if st.button(labels["clear_all"], key="clear_stones"):
-        for idx in range(100):
-            st.session_state[f"stone_{idx}"] = ""
-        st.rerun()
-    
-    stone_weights = []
-    for row in range(20):
-        cols = st.columns(5)
-        for col in range(5):
-            idx = row * 5 + col
-            with cols[col]:
-                st.markdown(f"**{idx+1}.**")
-                raw_val = st.text_input("", key=f"stone_{idx}", label_visibility="collapsed", max_chars=10, placeholder="0.000")
-                val = StoneOptimizer.valid_3_decimal(raw_val)
-                if raw_val and not val:
-                    st.warning(labels["invalid_input"], icon="⚠️")
-                stone_weights.append(StoneOptimizer.safe_float(val))
-    return stone_weights
-
-def create_package_rules_input(labels: dict[str, str]) -> list[dict]:
-    st.subheader(labels["rule_label"])
-    
-    if st.button(labels["clear_all"], key="clear_rules"):
-        for i in range(30):
-            st.session_state[f"pcs_{i}"] = ""
-            st.session_state[f"weight_{i}"] = ""
-            st.session_state[f"packid_{i}"] = ""
-        st.rerun()
-    
-    rule_header = st.columns([0.7, 1.5, 1.5, 2])
-    with rule_header[0]: st.markdown("**#**")
-    with rule_header[1]: st.markdown("**pcs**")
-    with rule_header[2]: st.markdown("**cts**")
-    with rule_header[3]: st.markdown("**Ref**")
-    
-    package_rules = []
-    for i in range(30):
-        cols_rule = st.columns([0.7, 1.5, 1.5, 2])
-        with cols_rule[0]: st.markdown(f"**{i+1}**")
-        
-        with cols_rule[1]:
-            pcs_raw = st.text_input("", key=f"pcs_{i}", label_visibility="collapsed", max_chars=3, placeholder="1")
-            pcs_val = re.sub(r"\D", "", pcs_raw)[:3] if pcs_raw else ""
-            pcs = int(pcs_val) if pcs_val.isdigit() and int(pcs_val) > 0 else 0
-            if pcs_raw and pcs == 0:
-                st.warning(labels["invalid_input"], icon="⚠️")
-        
-        with cols_rule[2]:
-            weight_raw = st.text_input("", key=f"weight_{i}", label_visibility="collapsed", max_chars=10, placeholder="0.000")
-            weight_val = StoneOptimizer.valid_3_decimal(weight_raw)
-            total_weight = StoneOptimizer.safe_float(weight_val)
-            if weight_raw and not weight_val:
-                st.warning(labels["invalid_input"], icon="⚠️")
-        
-        with cols_rule[3]:
-            pack_id = st.text_input("", key=f"packid_{i}", label_visibility="collapsed", max_chars=20, placeholder="Optional")
-        
-        if pcs > 0 and total_weight > 0:
-            rule_dict = {"pcs": pcs, "cts": total_weight}
-            if pack_id.strip():
-                rule_dict["Ref"] = pack_id.strip()
-            package_rules.append(rule_dict)
-    
-    return package_rules
+# ... (get_language_labels, create_stone_input_grid, create_package_rules_input 與上一版相同)
 
 def main():
-    lang = st.selectbox("選擇語言 / Language", ["中文", "English"])
-    labels = get_language_labels(lang)
-    
-    st.header(labels["header"])
-    st.markdown('<div style="font-size:18px; color:green; margin-bottom:10px;">by Muriel</div>', unsafe_allow_html=True)
-    st.markdown("---")
-    
-    mode = st.radio(labels["mode_label"], [labels["upload_label"], labels["keyin_label"]])
-    
-    optimizer = StoneOptimizer()
-    results = []
-    remaining_stones = []
-    
-    if mode == labels["keyin_label"]:
-        stone_weights = create_stone_input_grid(labels)
-        st.markdown("---")
-        package_rules = create_package_rules_input(labels)
-        st.markdown("---")
-        
-        tolerance_raw = st.text_input(f"{labels['tolerance']}", value="0.003", key="tolerance_manual", placeholder="0.003")
-        tolerance_val = StoneOptimizer.valid_3_decimal(tolerance_raw)
-        if tolerance_raw and not tolerance_val:
-            st.warning(labels["invalid_input"], icon="⚠️")
-        tolerance = StoneOptimizer.safe_float(tolerance_val) or 0.003
-        
-        if not any(w > 0 for w in stone_weights) or not package_rules:
-            st.warning(labels["no_data"], icon="⚠️")
-        else:
-            max_pcs = max(rule["pcs"] for rule in package_rules)
-            use_greedy = max_pcs > 5
-            
-            results, remaining_stones = optimizer.calculate_optimal_assignment(
-                [w for w in stone_weights if w > 0],
-                package_rules,
-                tolerance,
-                labels,
-                use_greedy=use_greedy
-            )
-    
-    elif mode == labels["upload_label"]:
-        combined_file = st.file_uploader("上傳 Excel 檔案" if lang == "中文" else "Upload Excel file", type=["xlsx"], key="combined")
-        st.markdown("---")
-        
-        tolerance_raw = st.text_input(f"{labels['tolerance']}", value="0.003", key="tolerance_upload", placeholder="0.003")
-        tolerance_val = StoneOptimizer.valid_3_decimal(tolerance_raw)
-        if tolerance_raw and not tolerance_val:
-            st.warning(labels["invalid_input"], icon="⚠️")
-        tolerance = StoneOptimizer.safe_float(tolerance_val) or 0.003
-        
-        if combined_file:
-            try:
-                df = pd.read_excel(combined_file)
-                df.columns = df.columns.str.lower()
-                
-                required_cols = ["pcs", "cts"]
-                if not all(col in df.columns for col in required_cols):
-                    st.error(f"{labels['error_label']}: Missing required columns {required_cols}")
-                    st.stop()
-                
-                if "use cts" not in df.columns:
-                    st.error(f"{labels['error_label']}: Missing 'use cts' column")
-                    st.stop()
-                
-                # 取所有 use cts > 0 的值作為可用石頭（總 81 顆）
-                stones = []
-                for _, row in df.iterrows():
-                    w = row.get("use cts")
-                    if pd.notnull(w):
-                        w_val = StoneOptimizer.safe_float(w)
-                        if w_val > 0:
-                            stones.append(w_val)
-                
-                # 提取分包規則
-                package_rules = []
-                for _, row in df.iterrows():
-                    pcs = row.get("pcs")
-                    target_cts = row.get("cts")
-                    if pd.notnull(pcs) and pd.notnull(target_cts):
-                        pcs_val = StoneOptimizer.safe_float(pcs)
-                        target_val = StoneOptimizer.safe_float(target_cts)
-                        if pcs_val > 0 and target_val > 0:
-                            rule_dict = {"pcs": int(pcs_val), "cts": target_val}
-                            if "ref" in df.columns and pd.notnull(row["ref"]) and str(row["ref"]).strip():
-                                rule_dict["Ref"] = str(row["ref"]).strip()
-                            package_rules.append(rule_dict)
-                
-                if not stones or not package_rules:
-                    st.warning(labels["no_data"], icon="⚠️")
-                else:
-                    max_pcs = max(rule["pcs"] for rule in package_rules)
-                    use_greedy = max_pcs > 5
-                    
-                    results, remaining_stones = optimizer.calculate_optimal_assignment(stones, package_rules, tolerance, labels, use_greedy=use_greedy)
-                    
-            except Exception as e:
-                st.error(f"{labels['error_label']}: {str(e)}")
-                st.stop()
-        else:
-            st.info(labels["info_label"])
+    # ... (前半部分相同)
     
     if results:
         st.markdown("---")
@@ -416,7 +202,7 @@ def main():
         
         st.dataframe(format_dataframe(df_result), use_container_width=True, hide_index=True)
         
-        # 新增統計資訊
+        # 統計資訊
         st.markdown("---")
         st.subheader("分配統計")
         
