@@ -39,17 +39,17 @@ class StoneOptimizer:
             return s
         except (ValueError, TypeError):
             return ""
-
+    
     # 精確窮舉模式（僅用於 pcs <= 50）
     def find_exact_combination(self, available_stones: list[float], target_count: int, 
                                target_weight: float, tolerance: float) -> tuple[list[int], float] | None:
         for combo_indices in itertools.combinations(range(len(available_stones)), target_count):
             combo_weights = [available_stones[i] for i in combo_indices]
             total_weight = sum(combo_weights)
-            if abs(total_weight - target_weight) <= tolerance:
+            if abs(total_weight - target_weight) <= tolerance:  # 確保 <= tolerance
                 return (list(combo_indices), total_weight)
         return None
-
+    
     # Greedy 近似模式（快速，適用大 pcs）
     def find_greedy_combination(self, available_stones: list[float], target_count: int, 
                                 target_weight: float, tolerance: float) -> tuple[list[int], float] | None:
@@ -69,7 +69,7 @@ class StoneOptimizer:
             temp_count = len(selected_indices) + 1
             
             if temp_count == target_count:
-                if abs(temp_total - target_weight) <= tolerance:
+                if abs(temp_total - target_weight) <= tolerance:  # 確保 <= tolerance
                     selected_indices.append(idx)
                     return selected_indices, temp_total
             
@@ -78,11 +78,11 @@ class StoneOptimizer:
             current_total = temp_total
         
         # 如果剛好湊滿但誤差仍大於 tolerance，回傳 None
-        if len(selected_indices) == target_count and abs(current_total - target_weight) <= tolerance:
+        if len(selected_indices) == target_count and abs(current_total - target_weight) <= tolerance:  # 確保 <= tolerance
             return selected_indices, current_total
         
         return None
-
+    
     def calculate_optimal_assignment(self, stones: list[float], package_rules: list[dict], 
                                      tolerance: float, labels: dict[str, str], 
                                      use_greedy: bool = False) -> list[dict]:
@@ -273,7 +273,7 @@ def main():
     st.markdown('<div style="font-size:18px; color:green; margin-bottom:10px;">by Muriel</div>', unsafe_allow_html=True)
     st.markdown("---")
     
-    mode = st.radio(labels["mode_label"], [labels["upload_label"], labels["keyin_label"]])
+    mode = st.radio(labels["mode_label"], [labels["upload_label"], labels["keyin_label"])
     
     optimizer = StoneOptimizer()
     results = []
