@@ -47,13 +47,13 @@ class StoneOptimizer:
                 return (list(combo_indices), total_weight)
         return None
     
-        def find_greedy_combination(self, available_stones: list[float], target_count: int, 
+    def find_greedy_combination(self, available_stones: list[float], target_count: int, 
                                 target_weight: float, tolerance: float) -> tuple[list[int], float] | None:
         if target_count == 0:
             return [], 0.0
         
-        # 關鍵修改：從小到大排序，優先選小石頭
-        indexed_stones = sorted(enumerate(available_stones), key=lambda x: x[1])  # 改成升序（小→大）
+        # 從小到大排序，優先選小石頭（更適合大多數退石場景）
+        indexed_stones = sorted(enumerate(available_stones), key=lambda x: x[1])
         
         selected_indices = []
         current_total = 0.0
@@ -65,17 +65,14 @@ class StoneOptimizer:
             temp_total = current_total + weight
             temp_count = len(selected_indices) + 1
             
-            # 如果加這顆剛好湊滿，檢查誤差
             if temp_count == target_count:
                 if abs(temp_total - target_weight) <= tolerance:
                     selected_indices.append(idx)
                     return selected_indices, temp_total
             
-            # 繼續加（因為我們要的是小石頭湊精確）
             selected_indices.append(idx)
             current_total = temp_total
         
-        # 最後檢查是否正好湊滿且誤差在範圍內
         if len(selected_indices) == target_count and abs(current_total - target_weight) <= tolerance:
             return selected_indices, current_total
         
@@ -103,7 +100,7 @@ class StoneOptimizer:
             available_weights = [stones[i] for i in available_indices]
             
             match = None
-            if use_greedy or count > 5:  # pcs > 5 自動用 Greedy
+            if use_greedy or count > 5:  # pcs > 5 自動使用 Greedy
                 match = self.find_greedy_combination(available_weights, count, target, tolerance)
             else:
                 match = self.find_exact_combination(available_weights, count, target, tolerance)
@@ -286,7 +283,7 @@ def main():
             st.warning(labels["no_data"], icon="⚠️")
         else:
             max_pcs = max(rule["pcs"] for rule in package_rules)
-            use_greedy = max_pcs > 5  # pcs > 5 自動用 Greedy（無警告）
+            use_greedy = max_pcs > 5
             
             results = optimizer.calculate_optimal_assignment(
                 [w for w in stone_weights if w > 0],
@@ -320,7 +317,7 @@ def main():
                     st.error(f"{labels['error_label']}: Missing 'use cts' column")
                     st.stop()
                 
-                # 取所有 use cts > 0 的值作為石頭（自動適應任何數量）
+                # 取所有 use cts > 0 的值作為石頭
                 stones = []
                 for _, row in df.iterrows():
                     w = row.get("use cts")
@@ -347,7 +344,7 @@ def main():
                     st.warning(labels["no_data"], icon="⚠️")
                 else:
                     max_pcs = max(rule["pcs"] for rule in package_rules)
-                    use_greedy = max_pcs > 5  # pcs > 5 自動用 Greedy（無警告）
+                    use_greedy = max_pcs > 5
                     
                     results = optimizer.calculate_optimal_assignment(stones, package_rules, tolerance, labels, use_greedy=use_greedy)
                     
