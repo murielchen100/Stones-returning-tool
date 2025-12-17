@@ -221,7 +221,7 @@ def get_language_labels(lang: str) -> dict[str, str]:
             "stats_allocated": "已成功分配石頭",
             "stats_remaining": "未分配石頭",
             "stats_remaining_list": "未分配石頭重量（由小到大）",
-            "excel_format_hint": "### Excel 檔案格式需求\n檔案必須包含以下四欄（欄位名稱不區分大小寫）：\n- **ref**：袋子編號（可選，若無則自動編號）\n- **pcs**：該袋所需石頭數量（整數）\n- **cts**：該袋目標總重（小數，例如 1.854）\n- **use cts**：需要分配的石頭重量（所有填入的數值都會被視為可用石頭，包括分包規則行的值）\n\n**範例結構**：\n- 前幾行填分包條件（ref, pcs, cts, use cts 可填可不填）\n- 後續行只填 use cts 作為可用石頭\n所有 use cts > 0 的值都會被納入分配，且石頭不可重複使用。"
+            "excel_format_hint": "### Excel 檔案格式需求\n檔案必須包含以下四欄（欄位名稱不區分大小寫）：\n- **ref**：袋子編號（可選，若無則自動編號）\n- **pcs**：該袋所需石頭數量\n- **cts**：該袋目標總重\n- **use cts**：需要分配的石頭重量"
         }
     else:
         return {
@@ -248,7 +248,7 @@ def get_language_labels(lang: str) -> dict[str, str]:
             "stats_allocated": "Successfully allocated stones",
             "stats_remaining": "Unallocated stones",
             "stats_remaining_list": "Unallocated stone weights (sorted ascending)",
-            "excel_format_hint": "### Excel File Format Requirements\nThe file must contain the following four columns (case-insensitive):\n- **ref**: Package ID (optional, auto-numbered if absent)\n- **pcs**: Number of stones required for the package (integer)\n- **cts**: Target total weight for the package (decimal, e.g., 1.854)\n- **use cts**: Available stone weights to be allocated (all filled values will be treated as available stones)\n\n**Example structure**:\n- First few rows: package rules (ref, pcs, cts, use cts optional)\n- Subsequent rows: only fill use cts as available stones\nAll use cts > 0 values will be included in allocation, and stones cannot be reused."
+            "excel_format_hint": "### Excel File Format Requirements\nThe file must contain the following four columns (case-insensitive):\n- **ref**: Package ID (optional, auto-numbered if absent)\n- **pcs**: Number of stones required for the package\n- **cts**: Target total weight for the package \n- **use cts**: Available stone weights to be allocated"
         }
 
 def create_stone_input_grid(labels: dict[str, str]) -> list[float]:
