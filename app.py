@@ -56,6 +56,7 @@ class StoneOptimizer:
         if n < target_count:
             return None
         
+        # 初始 Greedy：从小到大排序
         remaining = list(enumerate(available_stones))
         remaining.sort(key=lambda x: x[1])
         
@@ -69,13 +70,11 @@ class StoneOptimizer:
             current_avg = current_total / len(selected) if selected else target_weight / target_count
             
             best_idx = None
-            best_diff = float('inf')
             best_weight = 0.0
             
             for idx, weight in remaining:
                 diff = abs(weight - current_avg)
-                if diff < best_diff:
-                    best_diff = diff
+                if best_idx is None or diff < abs(best_weight - current_avg):
                     best_idx = idx
                     best_weight = weight
             
@@ -111,7 +110,8 @@ class StoneOptimizer:
                     if new_diff <= tolerance:
                         new_selected = best_selected.copy()
                         new_selected[i] = out_idx
-                        return new_selected, new_total
+                        actual_total = sum(available_stones[j] for j in new_selected)  # 重新計算確保準確
+                        return new_selected, actual_total
                     
                     if new_diff < best_diff:
                         best_selected[i] = out_idx
@@ -123,7 +123,8 @@ class StoneOptimizer:
                 break
         
         if best_diff <= tolerance:
-            return best_selected, best_total
+            actual_total = sum(available_stones[i] for i in best_selected)
+            return best_selected, actual_total
         
         return None
     
@@ -133,7 +134,10 @@ class StoneOptimizer:
         results = []
         used_indices = set()
         
+        # 小包優先
         package_rules = sorted(package_rules, key=lambda x: x["pcs"])
+        
+        avg_pcs = sum(rule["pcs"] for rule in package_rules) / len(package_rules) if package_rules else 1
         
         progress_bar = st.progress(0)
         progress_text = st.empty()
@@ -144,6 +148,8 @@ class StoneOptimizer:
             target = float(rule[self.col_weight])
             pack_id = rule.get(self.col_ref, "")
             
+            dynamic_tolerance = tolerance * (count / avg_pcs)
+            
             progress_text.text(f"正在處理分包 {idx+1}/{total_packages}: {pack_id or f'第{idx+1}包'} (pcs={count})")
             progress_bar.progress((idx + 1) / total_packages)
             
@@ -152,20 +158,23 @@ class StoneOptimizer:
             
             match = None
             if use_greedy or count > 5:
-                match = self.find_greedy_with_local_search(available_weights, count, target, tolerance)
+                match = self.find_greedy_with_local_search(available_weights, count, target, dynamic_tolerance)
             else:
-                match = self.find_exact_combination(available_weights, count, target, tolerance)
+                match = self.find_exact_combination(available_weights, count, target, dynamic_tolerance)
             
             if match:
                 local_indices, total_assigned = match
                 global_indices = [available_indices[i] for i in local_indices]
                 combo_weights = [stones[i] for i in global_indices]
                 
+                # 關鍵保險：重新計算總和，確保分配重量 = 石頭總和
+                actual_total = sum(combo_weights)
+                
                 result_row = {
                     labels["assigned_stones"]: combo_weights,
-                    labels["assigned_weight"]: f"{total_assigned:.3f}",
+                    labels["assigned_weight"]: f"{actual_total:.3f}",
                     labels["expected_weight"]: f"{target:.3f}",
-                    labels["diff"]: f"{abs(total_assigned - target):.3f}"
+                    labels["diff"]: f"{abs(actual_total - target):.3f}"
                 }
                 if pack_id:
                     result_row[self.col_ref] = pack_id
@@ -216,7 +225,8 @@ def get_language_labels(lang: str) -> dict[str, str]:
             "clear_all": "清除全部",
             "stats_allocated": "已成功分配石頭",
             "stats_remaining": "未分配石頭",
-            "stats_remaining_list": "未分配石頭重量（由小到大）"
+            "stats_remaining_list": "未分配石頭重量（由小到大）",
+            "excel_format_hint": "### Excel 檔案格式需求\n檔案必須包含以下四欄（欄位名稱不區分大小寫）：\n- **ref**：袋子編號（可選）\n- **pcs**：該袋所需石頭數量（整數）\n- **cts**：該袋目標總重（小數，例如 1.854）\n- **use cts**：需要分配的石頭重量（所有填入的數值都會被視為可用石頭）\n\n**範例結構**：\n- 前幾行填分包條件（ref, pcs, cts, use cts 可填可不填）\n- 後續行只填 use cts 作為可用石頭\n所有 use cts > 0 的值都會被納入分配，且石頭不可重複使用。"
         }
     else:
         return {
@@ -242,7 +252,8 @@ def get_language_labels(lang: str) -> dict[str, str]:
             "clear_all": "Clear all",
             "stats_allocated": "Successfully allocated stones",
             "stats_remaining": "Unallocated stones",
-            "stats_remaining_list": "Unallocated stone weights (sorted ascending)"
+            "stats_remaining_list": "Unallocated stone weights (sorted ascending)",
+            "excel_format_hint": "### Excel File Format Requirements\nThe file must contain the following four columns (case-insensitive):\n- **ref**: Package ID (optional)\n- **pcs**: Number of stones required for the package (integer)\n- **cts**: Target total weight for the package (decimal, e.g., 1.854)\n- **use cts**: Available stone weights to be allocated (all filled values will be treated as available stones)\n\n**Example structure**:\n- First few rows: package rules (ref, pcs, cts, use cts optional)\n- Subsequent rows: only fill use cts as available stones\nAll use cts > 0 values will be included in allocation, and stones cannot be reused."
         }
 
 def create_stone_input_grid(labels: dict[str, str]) -> list[float]:
@@ -327,6 +338,7 @@ def main():
     optimizer = StoneOptimizer()
     results = []
     remaining_stones = []
+    stones = []
     
     if mode == labels["keyin_label"]:
         stone_weights = create_stone_input_grid(labels)
