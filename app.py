@@ -94,6 +94,7 @@ class StoneOptimizer:
         best_total = current_total
         best_diff = current_diff
         
+        # 局部搜尋
         for _ in range(200):
             improved = False
             for i in range(len(best_selected)):
@@ -110,7 +111,7 @@ class StoneOptimizer:
                     if new_diff <= tolerance:
                         new_selected = best_selected.copy()
                         new_selected[i] = out_idx
-                        actual_total = sum(available_stones[j] for j in new_selected)  # 重新計算確保準確
+                        actual_total = sum(available_stones[j] for j in new_selected)
                         return new_selected, actual_total
                     
                     if new_diff < best_diff:
@@ -134,7 +135,6 @@ class StoneOptimizer:
         results = []
         used_indices = set()
         
-        # 小包優先
         package_rules = sorted(package_rules, key=lambda x: x["pcs"])
         
         avg_pcs = sum(rule["pcs"] for rule in package_rules) / len(package_rules) if package_rules else 1
@@ -167,20 +167,33 @@ class StoneOptimizer:
                 global_indices = [available_indices[i] for i in local_indices]
                 combo_weights = [stones[i] for i in global_indices]
                 
-                # 關鍵保險：重新計算總和，確保分配重量 = 石頭總和
+                # 重新計算實際總和與差異
                 actual_total = sum(combo_weights)
+                actual_diff = abs(actual_total - target)
                 
-                result_row = {
-                    labels["assigned_stones"]: combo_weights,
-                    labels["assigned_weight"]: f"{actual_total:.3f}",
-                    labels["expected_weight"]: f"{target:.3f}",
-                    labels["diff"]: f"{abs(actual_total - target):.3f}"
-                }
-                if pack_id:
-                    result_row[self.col_ref] = pack_id
-                
-                results.append(result_row)
-                used_indices.update(global_indices)
+                # 嚴格檢查：只有 actual_diff ≤ dynamic_tolerance 才成功
+                if actual_diff <= dynamic_tolerance:
+                    result_row = {
+                        labels["assigned_stones"]: combo_weights,
+                        labels["assigned_weight"]: f"{actual_total:.3f}",
+                        labels["expected_weight"]: f"{target:.3f}",
+                        labels["diff"]: f"{actual_diff:.3f}"
+                    }
+                    if pack_id:
+                        result_row[self.col_ref] = pack_id
+                    
+                    results.append(result_row)
+                    used_indices.update(global_indices)
+                else:
+                    result_row = {
+                        labels["assigned_stones"]: labels["no_match"],
+                        labels["assigned_weight"]: "-",
+                        labels["expected_weight"]: f"{target:.3f}",
+                        labels["diff"]: "-"
+                    }
+                    if pack_id:
+                        result_row[self.col_ref] = pack_id
+                    results.append(result_row)
             else:
                 result_row = {
                     labels["assigned_stones"]: labels["no_match"],
