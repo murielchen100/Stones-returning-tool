@@ -135,8 +135,6 @@ class StoneOptimizer:
         
         package_rules = sorted(package_rules, key=lambda x: x["pcs"])
         
-        avg_pcs = sum(rule["pcs"] for rule in package_rules) / len(package_rules) if package_rules else 1
-        
         progress_bar = st.progress(0)
         progress_text = st.empty()
         total_packages = len(package_rules)
@@ -146,8 +144,6 @@ class StoneOptimizer:
             target = float(rule[self.col_weight])
             pack_id = rule.get(self.col_ref, "")
             
-            dynamic_tolerance = tolerance * (count / avg_pcs)
-            
             progress_text.text(f"正在處理分包 {idx+1}/{total_packages}: {pack_id or f'第{idx+1}包'} (pcs={count})")
             progress_bar.progress((idx + 1) / total_packages)
             
@@ -156,9 +152,9 @@ class StoneOptimizer:
             
             match = None
             if use_greedy or count > 5:
-                match = self.find_greedy_with_local_search(available_weights, count, target, dynamic_tolerance)
+                match = self.find_greedy_with_local_search(available_weights, count, target, tolerance)
             else:
-                match = self.find_exact_combination(available_weights, count, target, dynamic_tolerance)
+                match = self.find_exact_combination(available_weights, count, target, tolerance)
             
             if match:
                 local_indices, total_assigned = match
@@ -220,8 +216,7 @@ def get_language_labels(lang: str) -> dict[str, str]:
             "clear_all": "清除全部",
             "stats_allocated": "已成功分配石頭",
             "stats_remaining": "未分配石頭",
-            "stats_remaining_list": "未分配石頭重量（由小到大）",
-            "excel_format_hint": "### Excel 檔案格式需求\n檔案必須包含以下四欄（欄位名稱不區分大小寫）：\n- **ref**：袋子編號（可選，若無則自動編號）\n- **pcs**：該袋所需石頭數量\n- **cts**：該袋目標總重\n- **use cts**：需要分配的石頭重量"
+            "stats_remaining_list": "未分配石頭重量（由小到大）"
         }
     else:
         return {
@@ -247,8 +242,7 @@ def get_language_labels(lang: str) -> dict[str, str]:
             "clear_all": "Clear all",
             "stats_allocated": "Successfully allocated stones",
             "stats_remaining": "Unallocated stones",
-            "stats_remaining_list": "Unallocated stone weights (sorted ascending)",
-            "excel_format_hint": "### Excel File Format Requirements\nThe file must contain the following four columns (case-insensitive):\n- **ref**: Package ID (optional, auto-numbered if absent)\n- **pcs**: Number of stones required for the package\n- **cts**: Target total weight for the package \n- **use cts**: Available stone weights to be allocated"
+            "stats_remaining_list": "Unallocated stone weights (sorted ascending)"
         }
 
 def create_stone_input_grid(labels: dict[str, str]) -> list[float]:
@@ -333,7 +327,6 @@ def main():
     optimizer = StoneOptimizer()
     results = []
     remaining_stones = []
-    stones = []
     
     if mode == labels["keyin_label"]:
         stone_weights = create_stone_input_grid(labels)
@@ -364,7 +357,6 @@ def main():
             )
     
     elif mode == labels["upload_label"]:
-        # 新增檔案格式說明
         st.markdown(labels["excel_format_hint"])
         
         combined_file = st.file_uploader("上傳 Excel 檔案" if lang == "中文" else "Upload Excel file", type=["xlsx"], key="combined")
